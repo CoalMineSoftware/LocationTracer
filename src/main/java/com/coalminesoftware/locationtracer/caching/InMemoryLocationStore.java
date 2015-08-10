@@ -1,4 +1,4 @@
-package com.coalminesoftware.locationtracer.cache;
+package com.coalminesoftware.locationtracer.caching;
 
 import java.util.ArrayList;
 import java.util.Collection;

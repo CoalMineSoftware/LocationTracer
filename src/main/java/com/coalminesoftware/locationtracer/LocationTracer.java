@@ -14,7 +14,7 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.SystemClock;
 
-import com.coalminesoftware.locationtracer.cache.LocationStore;
+import com.coalminesoftware.locationtracer.caching.LocationStore;
 import com.coalminesoftware.locationtracer.reporting.LocationReporter;
 import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 import com.coalminesoftware.locationtracer.transformation.PassthroughLocationTransformer;

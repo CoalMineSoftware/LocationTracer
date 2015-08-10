@@ -1,8 +1,8 @@
 package com.coalminesoftware.locationtracer.transformation;
 
-import com.coalminesoftware.locationtracer.cache.LocationStore;
-
 import android.location.Location;
+
+import com.coalminesoftware.locationtracer.caching.LocationStore;
 
 /**
  * Transforms observed {@link Location}s into a given type prior to being offered to a {@link LocationStore}.
