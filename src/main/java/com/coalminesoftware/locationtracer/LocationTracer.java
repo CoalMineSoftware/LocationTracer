@@ -11,7 +11,6 @@ import android.content.IntentFilter;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
-import android.os.Bundle;
 import android.os.SystemClock;
 
 import com.coalminesoftware.locationtracer.caching.LocationStore;
@@ -20,6 +19,9 @@ import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 import com.coalminesoftware.locationtracer.transformation.PassthroughLocationTransformer;
 
 public class LocationTracer<StorageLocation> {
+	private static final String	REPORT_INTERVAL_DURATION_EXTRA_KEY = "reportIntervalDuration";
+	private static final String	WAKE_FOR_REPORT_EXTRA_KEY = "wakeForReport";
+
 	private Context context;
 
 	private LocationListener locationListener;
@@ -30,17 +32,13 @@ public class LocationTracer<StorageLocation> {
 	private PendingIntent reportingAlarmPendingIntent;
 	private LocationReportingBroadcastReceiver reportingBroadcastReceiver;
 
-	// I would rather pass these along than store them
-	private long reportIntervalDuration;
-	private boolean wakeForReport;
-
 	private LocationTracer(Context context, LocationTransformer<StorageLocation> locationTransformer,
 			LocationStore<StorageLocation> locationStore, LocationReporter<StorageLocation> locationReporter) {
 		this.context = context;
 		this.locationStore = locationStore;
 		this.locationReporter = locationReporter;
 
-		locationListener = new CachingLocationListener(locationTransformer, locationStore);
+		locationListener = new CachingLocationListener<StorageLocation>(locationTransformer, locationStore);
 		reportingBroadcastReceiver = new LocationReportingBroadcastReceiver();
 	}
 
@@ -71,11 +69,12 @@ public class LocationTracer<StorageLocation> {
 	}
 
 	public void startReporting(long reportIntervalDuration, boolean wakeForReport) {
-		this.reportIntervalDuration = reportIntervalDuration;
-		this.wakeForReport = wakeForReport;
+		if(reportingAlarmPendingIntent != null) {
+			throw new RuntimeException("Cannot start reporting when reporting is already in progress.");
+		}
 
 		registerReportingAlarmReceiver();
-		scheduleLocationReport();
+		scheduleLocationReport(reportIntervalDuration, wakeForReport);
 	}
 
 	public void stopReporting(boolean reportUnreportedLocations) {
@@ -104,20 +103,23 @@ public class LocationTracer<StorageLocation> {
 		context.unregisterReceiver(reportingBroadcastReceiver);
 	}
 
-	private synchronized void scheduleLocationReport() {
+	private synchronized void scheduleLocationReport(long reportIntervalDuration, boolean wakeForReport) {
 		int alarmType = wakeForReport? AlarmManager.ELAPSED_REALTIME_WAKEUP : AlarmManager.ELAPSED_REALTIME;
 		getAlarmManager().set(alarmType,
 				SystemClock.elapsedRealtime() + reportIntervalDuration,
-				getOrCreateReportingAlarmPendingIntent());
+				getOrCreateReportingAlarmPendingIntent(reportIntervalDuration, wakeForReport));
 	}
 
 	private void cancelReportingAlarm() {
-		getAlarmManager().cancel(getOrCreateReportingAlarmPendingIntent());
+		getAlarmManager().cancel(reportingAlarmPendingIntent);
 	}
 
-	private PendingIntent getOrCreateReportingAlarmPendingIntent() {
+	private PendingIntent getOrCreateReportingAlarmPendingIntent(long reportIntervalDuration, boolean wakeForReport) {
 		if(reportingAlarmPendingIntent == null) {
 			Intent intent = new Intent(LocationReportingBroadcastReceiver.REPORT_LOCATIONS_INTENT_ACTION);
+			intent.putExtra(REPORT_INTERVAL_DURATION_EXTRA_KEY, reportIntervalDuration);
+			intent.putExtra(WAKE_FOR_REPORT_EXTRA_KEY, wakeForReport);
+
 			reportingAlarmPendingIntent = PendingIntent.getBroadcast(context, 0, intent, 0);
 		}
 		
@@ -141,8 +143,11 @@ public class LocationTracer<StorageLocation> {
 
 		@Override
 		public void onReceive(Context context, Intent intent) {
-			scheduleLocationReport();
+			long reportIntervalDuration = intent.getExtras().getLong(REPORT_INTERVAL_DURATION_EXTRA_KEY);
+			boolean wakeForReport = intent.getExtras().getBoolean(WAKE_FOR_REPORT_EXTRA_KEY);
+
 			reportStoredLocations();
+			scheduleLocationReport(reportIntervalDuration, wakeForReport);
 		}
 	}
 }
