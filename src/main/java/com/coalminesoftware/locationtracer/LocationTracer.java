@@ -20,17 +20,20 @@ import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 import com.coalminesoftware.locationtracer.transformation.PassthroughLocationTransformer;
 
 public class LocationTracer<StorageLocation> {
-	private static final String	REPORT_LOCATIONS_INTENT_ACTION	= "com.coalminesoftware.locationtracer.REPORT_LOCATIONS";
+	private static final String	REPORT_LOCATIONS_INTENT_ACTION = "com.coalminesoftware.locationtracer.REPORT_LOCATIONS";
 
 	private Context context;
 
 	private LocationListener locationListener = new CachingLocationListener();
+
 	private LocationTransformer<StorageLocation> locationTransformer;
 	private LocationStore<StorageLocation> locationStore;
 	private LocationReporter<StorageLocation> locationReporter;
 
 	private PendingIntent reportingAlarmPendingIntent;
-	private LocationReportingBroadcastReceiver locationReportingBroadcastReceiver;
+	private LocationReportingBroadcastReceiver reportingBroadcastReceiver;
+
+	// I would rather pass these along than store them
 	private long reportIntervalDuration;
 	private boolean wakeForReport;
 
@@ -41,7 +44,7 @@ public class LocationTracer<StorageLocation> {
 		this.locationStore = locationStore;
 		this.locationReporter = locationReporter;
 
-		locationReportingBroadcastReceiver = new LocationReportingBroadcastReceiver();
+		reportingBroadcastReceiver = new LocationReportingBroadcastReceiver();
 	}
 
 	public static LocationTracer<Location> newInstance(Context context, LocationStore<Location> locationStore,
@@ -56,15 +59,15 @@ public class LocationTracer<StorageLocation> {
 	}
 
 	public synchronized void startListeningActively(long locationUpdateIntervalDuration, long reportIntervalDuration, boolean wakeForReport) {
-
 		// TODO Check whether the tracer is already started
+
+		this.reportIntervalDuration = reportIntervalDuration;
+		this.wakeForReport = wakeForReport;
 
 		String providerName = determineBestActiveLocationProviderName(getLocationManager());
 		getLocationManager().requestLocationUpdates(providerName, locationUpdateIntervalDuration, 0, locationListener);
 
-		registerLocationReportingAlarmReceiver();
-		this.reportIntervalDuration = reportIntervalDuration;
-		this.wakeForReport = wakeForReport;
+		registerReportingAlarmReceiver();
 		scheduleLocationReport();
 	}
 
@@ -76,7 +79,7 @@ public class LocationTracer<StorageLocation> {
 		getLocationManager().removeUpdates(locationListener);
 
 		cancelReportingAlarm();
-		unregisterLocationReportingAlarmReceiver();
+		unregisterReportingAlarmReceiver();
 
 		if(reportUnreportedLocations) {
 			reportStoredLocations();
@@ -91,16 +94,16 @@ public class LocationTracer<StorageLocation> {
 		}
 	}
 
-	private void registerLocationReportingAlarmReceiver() {
+	private void registerReportingAlarmReceiver() {
 		IntentFilter filter = new IntentFilter(REPORT_LOCATIONS_INTENT_ACTION);
-		context.registerReceiver(locationReportingBroadcastReceiver, filter);
+		context.registerReceiver(reportingBroadcastReceiver, filter);
 	}
 
-	private void unregisterLocationReportingAlarmReceiver() {
-		context.unregisterReceiver(locationReportingBroadcastReceiver);
+	private void unregisterReportingAlarmReceiver() {
+		context.unregisterReceiver(reportingBroadcastReceiver);
 	}
 
-	private void scheduleLocationReport() {
+	private synchronized void scheduleLocationReport() {
 		int alarmType = wakeForReport? AlarmManager.ELAPSED_REALTIME_WAKEUP : AlarmManager.ELAPSED_REALTIME;
 		getAlarmManager().set(alarmType,
 				SystemClock.elapsedRealtime() + reportIntervalDuration,
@@ -151,7 +154,7 @@ public class LocationTracer<StorageLocation> {
 	private class LocationReportingBroadcastReceiver extends BroadcastReceiver {
 		@Override
 		public void onReceive(Context context, Intent intent) {
-			scheduleLocationReport(); // TODO Use the value passed in
+			scheduleLocationReport();
 			reportStoredLocations();
 		}
 	}

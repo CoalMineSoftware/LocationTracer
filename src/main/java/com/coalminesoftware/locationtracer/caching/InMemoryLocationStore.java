@@ -25,9 +25,17 @@ public class InMemoryLocationStore<StorageLocation> implements LocationStore<Sto
 		locations.addLast(location);
 
 		while(locations.size() > locationCountLimit) {
-			locations.removeFirst();
+			StorageLocation removedLocation = locations.removeFirst();
+			onLocationPurged(removedLocation);
 		}
 	}
+
+	/**
+	 * Called when an excess location is purged from the cache.
+	 * 
+	 * @param removedLocation The location that was removed.
+	 */
+	protected void onLocationPurged(StorageLocation removedLocation) { }
 
 	@Override
 	public int getLocationCount() {
