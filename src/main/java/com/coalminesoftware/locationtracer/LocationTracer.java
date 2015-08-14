@@ -20,13 +20,10 @@ import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 import com.coalminesoftware.locationtracer.transformation.PassthroughLocationTransformer;
 
 public class LocationTracer<StorageLocation> {
-	private static final String	REPORT_LOCATIONS_INTENT_ACTION = "com.coalminesoftware.locationtracer.REPORT_LOCATIONS";
-
 	private Context context;
 
-	private LocationListener locationListener = new CachingLocationListener();
+	private LocationListener locationListener;
 
-	private LocationTransformer<StorageLocation> locationTransformer;
 	private LocationStore<StorageLocation> locationStore;
 	private LocationReporter<StorageLocation> locationReporter;
 
@@ -40,10 +37,10 @@ public class LocationTracer<StorageLocation> {
 	private LocationTracer(Context context, LocationTransformer<StorageLocation> locationTransformer,
 			LocationStore<StorageLocation> locationStore, LocationReporter<StorageLocation> locationReporter) {
 		this.context = context;
-		this.locationTransformer = locationTransformer;
 		this.locationStore = locationStore;
 		this.locationReporter = locationReporter;
 
+		locationListener = new CachingLocationListener(locationTransformer, locationStore);
 		reportingBroadcastReceiver = new LocationReportingBroadcastReceiver();
 	}
 
@@ -99,7 +96,7 @@ public class LocationTracer<StorageLocation> {
 	}
 
 	private void registerReportingAlarmReceiver() {
-		IntentFilter filter = new IntentFilter(REPORT_LOCATIONS_INTENT_ACTION);
+		IntentFilter filter = new IntentFilter(LocationReportingBroadcastReceiver.REPORT_LOCATIONS_INTENT_ACTION);
 		context.registerReceiver(reportingBroadcastReceiver, filter);
 	}
 
@@ -120,7 +117,7 @@ public class LocationTracer<StorageLocation> {
 
 	private PendingIntent getOrCreateReportingAlarmPendingIntent() {
 		if(reportingAlarmPendingIntent == null) {
-			Intent intent = new Intent(REPORT_LOCATIONS_INTENT_ACTION);
+			Intent intent = new Intent(LocationReportingBroadcastReceiver.REPORT_LOCATIONS_INTENT_ACTION);
 			reportingAlarmPendingIntent = PendingIntent.getBroadcast(context, 0, intent, 0);
 		}
 		
@@ -139,23 +136,9 @@ public class LocationTracer<StorageLocation> {
 		return (AlarmManager)context.getSystemService(Context.ALARM_SERVICE);
 	}
 
-	private class CachingLocationListener implements LocationListener {
-		@Override
-		public void onStatusChanged(String provider, int status, Bundle extras) { }
-
-		@Override
-		public void onProviderEnabled(String provider) { }
-
-		@Override
-		public void onProviderDisabled(String provider) { }
-
-		@Override
-		public void onLocationChanged(Location location) {
-			locationStore.offerLocation(locationTransformer.transformLocation(location));
-		}
-	};
-
 	private class LocationReportingBroadcastReceiver extends BroadcastReceiver {
+		protected static final String	REPORT_LOCATIONS_INTENT_ACTION = "com.coalminesoftware.locationtracer.REPORT_LOCATIONS";
+
 		@Override
 		public void onReceive(Context context, Intent intent) {
 			scheduleLocationReport();
