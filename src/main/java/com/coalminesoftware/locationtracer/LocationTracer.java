@@ -58,26 +58,30 @@ public class LocationTracer<StorageLocation> {
 		return new LocationTracer<StorageLocation>(context, locationTransformer, locationStore, locationReporter);
 	}
 
-	public synchronized void startListeningActively(long locationUpdateIntervalDuration, long reportIntervalDuration, boolean wakeForReport) {
+	public synchronized void startListeningActively(long locationUpdateIntervalDuration) {
 		// TODO Check whether the tracer is already started
-
-		this.reportIntervalDuration = reportIntervalDuration;
-		this.wakeForReport = wakeForReport;
 
 		String providerName = determineBestActiveLocationProviderName(getLocationManager());
 		getLocationManager().requestLocationUpdates(providerName, locationUpdateIntervalDuration, 0, locationListener);
-
-		registerReportingAlarmReceiver();
-		scheduleLocationReport();
 	}
 
 	public synchronized void startListeningPassively(Integer locationRequestInterval, LocationStore<StorageLocation> locationCache) {
 		throw new UnsupportedOperationException("Not yet implemented.");
 	}
 
-	public synchronized void stopListening(boolean reportUnreportedLocations) {
+	public synchronized void stopListening() {
 		getLocationManager().removeUpdates(locationListener);
+	}
 
+	public void startReporting(long reportIntervalDuration, boolean wakeForReport) {
+		this.reportIntervalDuration = reportIntervalDuration;
+		this.wakeForReport = wakeForReport;
+
+		registerReportingAlarmReceiver();
+		scheduleLocationReport();
+	}
+
+	public void stopReporting(boolean reportUnreportedLocations) {
 		cancelReportingAlarm();
 		unregisterReportingAlarmReceiver();
 
