@@ -24,22 +24,20 @@ public class LocationTracer<StorageLocation> {
 
 	private Context context;
 
-	private LocationListener locationListener;
-
 	private LocationStore<StorageLocation> locationStore;
 	private LocationReporter<StorageLocation> locationReporter;
 
-	private PendingIntent reportingAlarmPendingIntent;
-	private LocationReportingBroadcastReceiver reportingBroadcastReceiver;
+	private LocationListener locationListener;
+
+	private ReportingSession reportingSession;
 
 	private LocationTracer(Context context, LocationTransformer<StorageLocation> locationTransformer,
 			LocationStore<StorageLocation> locationStore, LocationReporter<StorageLocation> locationReporter) {
-		this.context = context;
+		this.context = context.getApplicationContext();
 		this.locationStore = locationStore;
 		this.locationReporter = locationReporter;
 
 		locationListener = new CachingLocationListener<StorageLocation>(locationTransformer, locationStore);
-		reportingBroadcastReceiver = new LocationReportingBroadcastReceiver();
 	}
 
 	public static LocationTracer<Location> newInstance(Context context, LocationStore<Location> locationStore,
@@ -69,12 +67,14 @@ public class LocationTracer<StorageLocation> {
 	}
 
 	public void startReporting(long reportIntervalDuration, boolean wakeForReport) {
-		if(reportingAlarmPendingIntent != null) {
-			throw new RuntimeException("Cannot start reporting when reporting is already in progress.");
+		if(reportingSession != null) {
+			throw new IllegalStateException("Cannot start reporting when reporting is already in progress.");
 		}
 
-		registerReportingAlarmReceiver();
-		scheduleLocationReport(reportIntervalDuration, wakeForReport);
+		BroadcastReceiver reportingAlarmBroadcastReceiver = registerReportingAlarmReceiver();
+		PendingIntent reportingAlarmPendingIntent = scheduleLocationReport(reportIntervalDuration, wakeForReport);
+
+		reportingSession = new ReportingSession(reportingAlarmPendingIntent, reportingAlarmBroadcastReceiver);
 	}
 
 	public void stopReporting(boolean reportUnreportedLocations) {
@@ -94,36 +94,42 @@ public class LocationTracer<StorageLocation> {
 		}
 	}
 
-	private void registerReportingAlarmReceiver() {
+	private BroadcastReceiver registerReportingAlarmReceiver() {
+		BroadcastReceiver broadcastReceiver = new LocationReportingBroadcastReceiver();
+
 		IntentFilter filter = new IntentFilter(LocationReportingBroadcastReceiver.REPORT_LOCATIONS_INTENT_ACTION);
-		context.registerReceiver(reportingBroadcastReceiver, filter);
+		context.registerReceiver(broadcastReceiver, filter);
+
+		return broadcastReceiver;
 	}
 
 	private void unregisterReportingAlarmReceiver() {
-		context.unregisterReceiver(reportingBroadcastReceiver);
+		context.unregisterReceiver(reportingSession.getReportingBroadcastReceiver());
 	}
 
-	private synchronized void scheduleLocationReport(long reportIntervalDuration, boolean wakeForReport) {
+	private synchronized PendingIntent scheduleLocationReport(long reportIntervalDuration, boolean wakeForReport) {
 		int alarmType = wakeForReport? AlarmManager.ELAPSED_REALTIME_WAKEUP : AlarmManager.ELAPSED_REALTIME;
+
+		PendingIntent reportingAlarmPendingIntent = buildReportingAlarmPendingIntent(reportIntervalDuration, wakeForReport);
+
 		getAlarmManager().set(alarmType,
 				SystemClock.elapsedRealtime() + reportIntervalDuration,
-				getOrCreateReportingAlarmPendingIntent(reportIntervalDuration, wakeForReport));
+				reportingAlarmPendingIntent);
+
+		return reportingAlarmPendingIntent;
 	}
 
 	private void cancelReportingAlarm() {
-		getAlarmManager().cancel(reportingAlarmPendingIntent);
+		getAlarmManager().cancel(reportingSession.getReportingAlarmPendingIntent());
+		reportingSession = null;
 	}
 
-	private PendingIntent getOrCreateReportingAlarmPendingIntent(long reportIntervalDuration, boolean wakeForReport) {
-		if(reportingAlarmPendingIntent == null) {
-			Intent intent = new Intent(LocationReportingBroadcastReceiver.REPORT_LOCATIONS_INTENT_ACTION);
-			intent.putExtra(REPORT_INTERVAL_DURATION_EXTRA_KEY, reportIntervalDuration);
-			intent.putExtra(WAKE_FOR_REPORT_EXTRA_KEY, wakeForReport);
+	private PendingIntent buildReportingAlarmPendingIntent(long reportIntervalDuration, boolean wakeForReport) {
+		Intent intent = new Intent(LocationReportingBroadcastReceiver.REPORT_LOCATIONS_INTENT_ACTION);
+		intent.putExtra(REPORT_INTERVAL_DURATION_EXTRA_KEY, reportIntervalDuration);
+		intent.putExtra(WAKE_FOR_REPORT_EXTRA_KEY, wakeForReport);
 
-			reportingAlarmPendingIntent = PendingIntent.getBroadcast(context, 0, intent, 0);
-		}
-		
-		return reportingAlarmPendingIntent;
+		return PendingIntent.getBroadcast(context, 0, intent, 0);
 	}
 
 	private String determineBestActiveLocationProviderName(LocationManager locationManager) {
@@ -148,6 +154,24 @@ public class LocationTracer<StorageLocation> {
 
 			reportStoredLocations();
 			scheduleLocationReport(reportIntervalDuration, wakeForReport);
+		}
+	}
+
+	private static class ReportingSession {
+		private PendingIntent reportingAlarmPendingIntent;
+		private BroadcastReceiver reportingBroadcastReceiver;
+
+		public ReportingSession(PendingIntent reportingAlarmPendingIntent, BroadcastReceiver reportingBroadcastReceiver) {
+			this.reportingAlarmPendingIntent = reportingAlarmPendingIntent;
+			this.reportingBroadcastReceiver = reportingBroadcastReceiver;
+		}
+
+		public PendingIntent getReportingAlarmPendingIntent() {
+			return reportingAlarmPendingIntent;
+		}
+
+		public BroadcastReceiver getReportingBroadcastReceiver() {
+			return reportingBroadcastReceiver;
 		}
 	}
 }
