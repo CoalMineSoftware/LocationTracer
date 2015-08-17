@@ -21,6 +21,7 @@ import com.coalminesoftware.locationtracer.transformation.PassthroughLocationTra
 public class LocationTracer<StorageLocation> {
 	private static final String	REPORT_INTERVAL_DURATION_EXTRA_KEY = "reportIntervalDuration";
 	private static final String	WAKE_FOR_REPORT_EXTRA_KEY = "wakeForReport";
+	private static int	REPORTING_RECEIVER_INSTANCE_COUNT = 0;
 
 	private Context context;
 
@@ -28,6 +29,7 @@ public class LocationTracer<StorageLocation> {
 	private LocationReporter<StorageLocation> locationReporter;
 
 	private LocationListener locationListener;
+	private boolean listening;
 
 	private ReportingSession reportingSession;
 
@@ -52,10 +54,14 @@ public class LocationTracer<StorageLocation> {
 	}
 
 	public synchronized void startListeningActively(long locationUpdateIntervalDuration) {
-		// TODO Check whether the tracer is already started
+		if(listening) {
+			throw new IllegalStateException("Cannot start listening when listening is already in progress.");
+		}
 
 		String providerName = determineBestActiveLocationProviderName(getLocationManager());
 		getLocationManager().requestLocationUpdates(providerName, locationUpdateIntervalDuration, 0, locationListener);
+
+		listening = true;
 	}
 
 	public synchronized void startListeningPassively(Integer locationRequestInterval, LocationStore<StorageLocation> locationCache) {
@@ -64,6 +70,8 @@ public class LocationTracer<StorageLocation> {
 
 	public synchronized void stopListening() {
 		getLocationManager().removeUpdates(locationListener);
+
+		listening = false;
 	}
 
 	public void startReporting(long reportIntervalDuration, boolean wakeForReport) {
@@ -71,8 +79,11 @@ public class LocationTracer<StorageLocation> {
 			throw new IllegalStateException("Cannot start reporting when reporting is already in progress.");
 		}
 
-		BroadcastReceiver reportingAlarmBroadcastReceiver = registerReportingAlarmReceiver();
-		PendingIntent reportingAlarmPendingIntent = scheduleLocationReport(reportIntervalDuration, wakeForReport);
+		LocationReportingBroadcastReceiver reportingAlarmBroadcastReceiver = registerReportingAlarmReceiver();
+		PendingIntent reportingAlarmPendingIntent = scheduleLocationReport(
+				reportingAlarmBroadcastReceiver.getGeneratedReportLocationsIntentAction(),
+				reportIntervalDuration,
+				wakeForReport);
 
 		reportingSession = new ReportingSession(reportingAlarmPendingIntent, reportingAlarmBroadcastReceiver);
 	}
@@ -80,6 +91,8 @@ public class LocationTracer<StorageLocation> {
 	public void stopReporting(boolean reportUnreportedLocations) {
 		cancelReportingAlarm();
 		unregisterReportingAlarmReceiver();
+
+		reportingSession = null;
 
 		if(reportUnreportedLocations) {
 			reportStoredLocations();
@@ -94,10 +107,10 @@ public class LocationTracer<StorageLocation> {
 		}
 	}
 
-	private BroadcastReceiver registerReportingAlarmReceiver() {
-		BroadcastReceiver broadcastReceiver = new LocationReportingBroadcastReceiver();
+	private LocationReportingBroadcastReceiver registerReportingAlarmReceiver() {
+		LocationReportingBroadcastReceiver broadcastReceiver = new LocationReportingBroadcastReceiver();
 
-		IntentFilter filter = new IntentFilter(LocationReportingBroadcastReceiver.REPORT_LOCATIONS_INTENT_ACTION);
+		IntentFilter filter = new IntentFilter(broadcastReceiver.getGeneratedReportLocationsIntentAction());
 		context.registerReceiver(broadcastReceiver, filter);
 
 		return broadcastReceiver;
@@ -107,10 +120,10 @@ public class LocationTracer<StorageLocation> {
 		context.unregisterReceiver(reportingSession.getReportingBroadcastReceiver());
 	}
 
-	private synchronized PendingIntent scheduleLocationReport(long reportIntervalDuration, boolean wakeForReport) {
+	private synchronized PendingIntent scheduleLocationReport(String receiverAction, long reportIntervalDuration, boolean wakeForReport) {
 		int alarmType = wakeForReport? AlarmManager.ELAPSED_REALTIME_WAKEUP : AlarmManager.ELAPSED_REALTIME;
 
-		PendingIntent reportingAlarmPendingIntent = buildReportingAlarmPendingIntent(reportIntervalDuration, wakeForReport);
+		PendingIntent reportingAlarmPendingIntent = buildReportingAlarmPendingIntent(receiverAction, reportIntervalDuration, wakeForReport);
 
 		getAlarmManager().set(alarmType,
 				SystemClock.elapsedRealtime() + reportIntervalDuration,
@@ -121,11 +134,10 @@ public class LocationTracer<StorageLocation> {
 
 	private void cancelReportingAlarm() {
 		getAlarmManager().cancel(reportingSession.getReportingAlarmPendingIntent());
-		reportingSession = null;
 	}
 
-	private PendingIntent buildReportingAlarmPendingIntent(long reportIntervalDuration, boolean wakeForReport) {
-		Intent intent = new Intent(LocationReportingBroadcastReceiver.REPORT_LOCATIONS_INTENT_ACTION);
+	private PendingIntent buildReportingAlarmPendingIntent(String receiverAction, long reportIntervalDuration, boolean wakeForReport) {
+		Intent intent = new Intent(receiverAction);
 		intent.putExtra(REPORT_INTERVAL_DURATION_EXTRA_KEY, reportIntervalDuration);
 		intent.putExtra(WAKE_FOR_REPORT_EXTRA_KEY, wakeForReport);
 
@@ -145,7 +157,9 @@ public class LocationTracer<StorageLocation> {
 	}
 
 	private class LocationReportingBroadcastReceiver extends BroadcastReceiver {
-		protected static final String	REPORT_LOCATIONS_INTENT_ACTION = "com.coalminesoftware.locationtracer.REPORT_LOCATIONS";
+		private static final String BASE_REPORT_LOCATIONS_ACTION = "com.coalminesoftware.locationtracer.REPORT_LOCATIONS";
+
+		private String reportLocationsIntentAction = generateLocationReportingAction();
 
 		@Override
 		public void onReceive(Context context, Intent intent) {
@@ -153,7 +167,17 @@ public class LocationTracer<StorageLocation> {
 			boolean wakeForReport = intent.getExtras().getBoolean(WAKE_FOR_REPORT_EXTRA_KEY);
 
 			reportStoredLocations();
-			scheduleLocationReport(reportIntervalDuration, wakeForReport);
+			scheduleLocationReport(intent.getAction(), reportIntervalDuration, wakeForReport);
+		}
+
+		public String getGeneratedReportLocationsIntentAction() {
+			return reportLocationsIntentAction;
+		}
+
+		private String generateLocationReportingAction() {
+			return context.getPackageName() + "/" +
+					BASE_REPORT_LOCATIONS_ACTION + "/" +
+					REPORTING_RECEIVER_INSTANCE_COUNT++;
 		}
 	}
 
