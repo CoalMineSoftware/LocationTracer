@@ -19,9 +19,9 @@ import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 import com.coalminesoftware.locationtracer.transformation.PassthroughLocationTransformer;
 
 public class LocationTracer<StorageLocation> {
-	private static final String	REPORT_INTERVAL_DURATION_EXTRA_KEY = "reportIntervalDuration";
-	private static final String	WAKE_FOR_REPORT_EXTRA_KEY = "wakeForReport";
-	private static int	REPORTING_RECEIVER_INSTANCE_COUNT = 0;
+	private static final String REPORT_INTERVAL_DURATION_EXTRA_KEY = "reportIntervalDuration";
+	private static final String WAKE_FOR_REPORT_EXTRA_KEY = "wakeForReport";
+	private static int REPORTING_RECEIVER_INSTANCE_COUNT = 0;
 
 	private Context context;
 
@@ -54,9 +54,7 @@ public class LocationTracer<StorageLocation> {
 	}
 
 	public synchronized void startListeningActively(long locationUpdateIntervalDuration) {
-		if(listening) {
-			throw new IllegalStateException("Cannot start listening when listening is already in progress.");
-		}
+		verifyListeningNotInProgress();
 
 		String providerName = determineBestActiveLocationProviderName(getLocationManager());
 		getLocationManager().requestLocationUpdates(providerName, locationUpdateIntervalDuration, 0, locationListener);
@@ -64,12 +62,36 @@ public class LocationTracer<StorageLocation> {
 		listening = true;
 	}
 
-	public synchronized void startListeningPassively(Integer locationRequestInterval, LocationStore<StorageLocation> locationCache) {
-		throw new UnsupportedOperationException("Not yet implemented.");
+	public synchronized void startListeningPassively() {
+		startListeningPassively(null);
+	}
+
+	public synchronized void startListeningPassively(Integer activeLocationRequestInterval) {
+		verifyListeningNotInProgress();
+
+		getLocationManager().requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 0, 0, locationListener);
+
+		if(activeLocationRequestInterval != null) {			
+			registerActiveLocationUpdate(activeLocationRequestInterval);
+		}
+
+		listening = true;
+	}
+
+	private void registerActiveLocationUpdate(Integer activeLocationRequestInterval) {
+		// TODO Do it.
+	}
+
+	private void verifyListeningNotInProgress() {
+		if(listening) {
+			throw new IllegalStateException("Cannot start listening when listening is already in progress.");
+		}
 	}
 
 	public synchronized void stopListening() {
 		getLocationManager().removeUpdates(locationListener);
+
+		// TODO If active updates were requested when starting passive listening, cancel them here.
 
 		listening = false;
 	}
