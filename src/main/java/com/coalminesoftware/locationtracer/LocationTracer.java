@@ -2,27 +2,18 @@ package com.coalminesoftware.locationtracer;
 
 import java.util.List;
 
-import android.app.AlarmManager;
-import android.app.PendingIntent;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
-import android.os.SystemClock;
 
+import com.coalminesoftware.locationtracer.alarm.RecurringAlarm;
 import com.coalminesoftware.locationtracer.caching.LocationStore;
 import com.coalminesoftware.locationtracer.reporting.LocationReporter;
 import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 import com.coalminesoftware.locationtracer.transformation.PassthroughLocationTransformer;
 
 public class LocationTracer<StorageLocation> {
-	private static final String REPORT_INTERVAL_DURATION_EXTRA_KEY = "reportIntervalDuration";
-	private static final String WAKE_FOR_REPORT_EXTRA_KEY = "wakeForReport";
-	private static int REPORTING_RECEIVER_INSTANCE_COUNT = 0;
-
 	private Context context;
 
 	private LocationStore<StorageLocation> locationStore;
@@ -101,19 +92,19 @@ public class LocationTracer<StorageLocation> {
 			throw new IllegalStateException("Cannot start reporting when reporting is already in progress.");
 		}
 
-		LocationReportingBroadcastReceiver reportingAlarmBroadcastReceiver = registerReportingAlarmReceiver();
-		PendingIntent reportingAlarmPendingIntent = scheduleLocationReport(
-				reportingAlarmBroadcastReceiver.getGeneratedReportLocationsIntentAction(),
-				reportIntervalDuration,
-				wakeForReport);
+		RecurringAlarm reportingAlarm = new RecurringAlarm(context, reportIntervalDuration, wakeForReport) {
+			@Override
+			public void handleAlarm() {
+				reportStoredLocations();
+			}
+		};
+		reportingAlarm.startRecurringReporting();
 
-		reportingSession = new ReportingSession(reportingAlarmPendingIntent, reportingAlarmBroadcastReceiver);
+		reportingSession = new ReportingSession(reportingAlarm);
 	}
 
 	public void stopReporting(boolean reportUnreportedLocations) {
-		cancelReportingAlarm();
-		unregisterReportingAlarmReceiver();
-
+		reportingSession.getReportingAlarm().stopRecurringReporting();
 		reportingSession = null;
 
 		if(reportUnreportedLocations) {
@@ -129,43 +120,6 @@ public class LocationTracer<StorageLocation> {
 		}
 	}
 
-	private LocationReportingBroadcastReceiver registerReportingAlarmReceiver() {
-		LocationReportingBroadcastReceiver broadcastReceiver = new LocationReportingBroadcastReceiver();
-
-		IntentFilter filter = new IntentFilter(broadcastReceiver.getGeneratedReportLocationsIntentAction());
-		context.registerReceiver(broadcastReceiver, filter);
-
-		return broadcastReceiver;
-	}
-
-	private void unregisterReportingAlarmReceiver() {
-		context.unregisterReceiver(reportingSession.getReportingBroadcastReceiver());
-	}
-
-	private synchronized PendingIntent scheduleLocationReport(String receiverAction, long reportIntervalDuration, boolean wakeForReport) {
-		int alarmType = wakeForReport? AlarmManager.ELAPSED_REALTIME_WAKEUP : AlarmManager.ELAPSED_REALTIME;
-
-		PendingIntent reportingAlarmPendingIntent = buildReportingAlarmPendingIntent(receiverAction, reportIntervalDuration, wakeForReport);
-
-		getAlarmManager().set(alarmType,
-				SystemClock.elapsedRealtime() + reportIntervalDuration,
-				reportingAlarmPendingIntent);
-
-		return reportingAlarmPendingIntent;
-	}
-
-	private void cancelReportingAlarm() {
-		getAlarmManager().cancel(reportingSession.getReportingAlarmPendingIntent());
-	}
-
-	private PendingIntent buildReportingAlarmPendingIntent(String receiverAction, long reportIntervalDuration, boolean wakeForReport) {
-		Intent intent = new Intent(receiverAction);
-		intent.putExtra(REPORT_INTERVAL_DURATION_EXTRA_KEY, reportIntervalDuration);
-		intent.putExtra(WAKE_FOR_REPORT_EXTRA_KEY, wakeForReport);
-
-		return PendingIntent.getBroadcast(context, 0, intent, 0);
-	}
-
 	private String determineBestActiveLocationProviderName(LocationManager locationManager) {
 		return LocationManager.GPS_PROVIDER;
 	}
@@ -174,50 +128,15 @@ public class LocationTracer<StorageLocation> {
 		return (LocationManager)context.getSystemService(Context.LOCATION_SERVICE);
 	}
 
-	private AlarmManager getAlarmManager() {
-		return (AlarmManager)context.getSystemService(Context.ALARM_SERVICE);
-	}
+	private class ReportingSession {
+		private RecurringAlarm reportingAlarm;
 
-	private class LocationReportingBroadcastReceiver extends BroadcastReceiver {
-		private static final String BASE_REPORT_LOCATIONS_ACTION = "com.coalminesoftware.locationtracer.REPORT_LOCATIONS";
-
-		private String reportLocationsIntentAction = generateLocationReportingAction();
-
-		@Override
-		public void onReceive(Context context, Intent intent) {
-			long reportIntervalDuration = intent.getExtras().getLong(REPORT_INTERVAL_DURATION_EXTRA_KEY);
-			boolean wakeForReport = intent.getExtras().getBoolean(WAKE_FOR_REPORT_EXTRA_KEY);
-
-			reportStoredLocations();
-			scheduleLocationReport(intent.getAction(), reportIntervalDuration, wakeForReport);
+		public ReportingSession(RecurringAlarm reportingAlarm) {
+			this.reportingAlarm = reportingAlarm;
 		}
 
-		public String getGeneratedReportLocationsIntentAction() {
-			return reportLocationsIntentAction;
-		}
-
-		private String generateLocationReportingAction() {
-			return context.getPackageName() + "/" +
-					BASE_REPORT_LOCATIONS_ACTION + "/" +
-					REPORTING_RECEIVER_INSTANCE_COUNT++;
-		}
-	}
-
-	private static class ReportingSession {
-		private PendingIntent reportingAlarmPendingIntent;
-		private BroadcastReceiver reportingBroadcastReceiver;
-
-		public ReportingSession(PendingIntent reportingAlarmPendingIntent, BroadcastReceiver reportingBroadcastReceiver) {
-			this.reportingAlarmPendingIntent = reportingAlarmPendingIntent;
-			this.reportingBroadcastReceiver = reportingBroadcastReceiver;
-		}
-
-		public PendingIntent getReportingAlarmPendingIntent() {
-			return reportingAlarmPendingIntent;
-		}
-
-		public BroadcastReceiver getReportingBroadcastReceiver() {
-			return reportingBroadcastReceiver;
+		public RecurringAlarm getReportingAlarm() {
+			return reportingAlarm;
 		}
 	}
 }
