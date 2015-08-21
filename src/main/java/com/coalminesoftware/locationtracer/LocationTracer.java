@@ -98,13 +98,13 @@ public class LocationTracer<StorageLocation> {
 				reportStoredLocations();
 			}
 		};
-		reportingAlarm.startRecurringReporting();
+		reportingAlarm.startRecurringAlarm();
 
 		reportingSession = new ReportingSession(reportingAlarm);
 	}
 
 	public void stopReporting(boolean reportUnreportedLocations) {
-		reportingSession.getReportingAlarm().stopRecurringReporting();
+		reportingSession.getReportingAlarm().stopRecurringAlarm();
 		reportingSession = null;
 
 		if(reportUnreportedLocations) {
