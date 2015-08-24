@@ -16,9 +16,9 @@ public abstract class RecurringAlarm extends BaseRecurringAlarm {
 	}
 
 	@Override
-	protected void scheduleAlarm() {
-		// All repeating alarms are inexact on Android 4.4+ so this code requests them specifically, to ensure similar
-		// behavior between pre- and post-KitKat devices.
+	protected void scheduleAlarm(long alarmElapsedRealtime) {
+		// All repeating alarms are inexact on Android 4.4+ so this code requests inexact alarms specifically, to ensure
+		// similar behavior between pre- and post-KitKat devices.
 		getAlarmManager(getContext()).setInexactRepeating(
 				getAlarmType(),
 				SystemClock.elapsedRealtime() + alarmIntervalDuration,

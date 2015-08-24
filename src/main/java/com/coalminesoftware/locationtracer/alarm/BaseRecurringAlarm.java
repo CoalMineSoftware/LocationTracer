@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.SystemClock;
 
 public abstract class BaseRecurringAlarm extends BroadcastReceiver {
 	private static final String BASE_ALARM_ACTION = "com.coalminesoftware.locationtracer.TRIGGER_RECURRING_ALARM";
@@ -25,11 +26,11 @@ public abstract class BaseRecurringAlarm extends BroadcastReceiver {
 		alarmPendingIntent = buildPendingIntent(context, alarmIntentAction);
 	}
 
-	public abstract void handleAlarm();
+	public abstract void handleAlarm(long alarmElapsedRealtime);
 
 	public void startRecurringAlarm() {
 		registerAlarmReceiver();
-		scheduleAlarm();
+		scheduleAlarm(SystemClock.elapsedRealtime());
 	}
 
 	public void stopRecurringAlarm() {
@@ -39,7 +40,7 @@ public abstract class BaseRecurringAlarm extends BroadcastReceiver {
 
 	@Override
 	public void onReceive(Context context, Intent intent) {
-		handleAlarm();
+		handleAlarm(SystemClock.elapsedRealtime());
 	}
 
 	private void registerAlarmReceiver() {
@@ -50,7 +51,7 @@ public abstract class BaseRecurringAlarm extends BroadcastReceiver {
 		context.unregisterReceiver(this);
 	}
 
-	protected abstract void scheduleAlarm();
+	protected abstract void scheduleAlarm(long alarmElapsedRealtime);
 
 	protected int determineAlarmType(boolean wakeForAlarm) {
 		return wakeForAlarm? AlarmManager.ELAPSED_REALTIME_WAKEUP : AlarmManager.ELAPSED_REALTIME;

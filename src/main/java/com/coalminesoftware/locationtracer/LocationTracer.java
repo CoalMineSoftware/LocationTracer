@@ -6,9 +6,13 @@ import android.content.Context;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.Looper;
 
+import com.coalminesoftware.locationtracer.alarm.IrregularRecurringAlarm;
 import com.coalminesoftware.locationtracer.alarm.RecurringAlarm;
 import com.coalminesoftware.locationtracer.caching.LocationStore;
+import com.coalminesoftware.locationtracer.listener.CachingLocationListener;
+import com.coalminesoftware.locationtracer.listener.DefaultLocationListener;
 import com.coalminesoftware.locationtracer.reporting.LocationReporter;
 import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 import com.coalminesoftware.locationtracer.transformation.PassthroughLocationTransformer;
@@ -53,24 +57,59 @@ public class LocationTracer<StorageLocation> {
 		listening = true;
 	}
 
-	public synchronized void startListeningPassively() {
-		startListeningPassively(null);
-	}
-
-	public synchronized void startListeningPassively(Integer activeLocationRequestInterval) {
+	public synchronized void startListeningPassively(Long activeLocationRequestInterval, boolean wakeForActiveLocationRequests) {
 		verifyListeningNotInProgress();
 
 		getLocationManager().requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 0, 0, locationListener);
 
 		if(activeLocationRequestInterval != null) {			
-			registerActiveLocationUpdate(activeLocationRequestInterval);
+			registerActiveLocationUpdate(activeLocationRequestInterval, wakeForActiveLocationRequests);
 		}
 
 		listening = true;
 	}
 
-	private void registerActiveLocationUpdate(Integer activeLocationRequestInterval) {
-		// TODO Do it.
+	private IrregularRecurringAlarm registerActiveLocationUpdate(final long activeLocationRequestInterval, boolean wakeForActiveLocationRequests) {
+		IrregularRecurringAlarm alarm = new IrregularRecurringAlarm(context, wakeForActiveLocationRequests) {
+			@Override
+			protected long determineNextAlarmDelay(long alarmElapsedRealtime) {
+				Long timeElapsedSinceLastLocation = determineTimeElapsedSinceLastLocation(alarmElapsedRealtime);
+				if(timeElapsedSinceLastLocation == null) {
+					return activeLocationRequestInterval;
+				}
+
+				long remainingTime = activeLocationRequestInterval - timeElapsedSinceLastLocation;
+				return remainingTime > 0? // TODO Verify that if this is the case, the check in (2) below evaluates as needed
+						remainingTime :
+						activeLocationRequestInterval;
+			}
+
+			@Override
+			public void handleAlarm(long alarmElapsedRealtime) {
+				Long timeElapsedSinceLastLocation = determineTimeElapsedSinceLastLocation(alarmElapsedRealtime);
+				if(timeElapsedSinceLastLocation == null ||
+						timeElapsedSinceLastLocation >= activeLocationRequestInterval) { // TODO (2)
+
+					// A no-op location listener is used to avoid duplicate updates.  The update this causes will be
+					// handled by the passive listener.
+					getLocationManager().requestSingleUpdate(
+							LocationManager.NETWORK_PROVIDER, // TODO Switch this back to GPS.
+							DefaultLocationListener.INSTANCE,
+							Looper.myLooper());
+				}
+			}
+
+			private Long determineTimeElapsedSinceLastLocation(long alarmElapsedRealtime) {
+				Long lastLocationObservationTimestamp = locationStore.getLastLocationOfferElapsedRealtime();
+				return lastLocationObservationTimestamp == null?
+						null :
+						alarmElapsedRealtime - lastLocationObservationTimestamp;
+			}
+		};
+
+		alarm.startRecurringAlarm();
+
+		return alarm;
 	}
 
 	private void verifyListeningNotInProgress() {
@@ -94,7 +133,7 @@ public class LocationTracer<StorageLocation> {
 
 		RecurringAlarm reportingAlarm = new RecurringAlarm(context, reportIntervalDuration, wakeForReport) {
 			@Override
-			public void handleAlarm() {
+			public void handleAlarm(long alarmElapsedRealtime) {
 				reportStoredLocations();
 			}
 		};

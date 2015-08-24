@@ -1,13 +1,11 @@
-package com.coalminesoftware.locationtracer;
+package com.coalminesoftware.locationtracer.listener;
+
+import android.location.Location;
 
 import com.coalminesoftware.locationtracer.caching.LocationStore;
 import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 
-import android.location.Location;
-import android.location.LocationListener;
-import android.os.Bundle;
-
-class CachingLocationListener<StorageLocation> implements LocationListener {
+public class CachingLocationListener<StorageLocation> extends DefaultLocationListener {
 	private LocationTransformer<StorageLocation> locationTransformer;
 	private LocationStore<StorageLocation> locationStore;
 
@@ -15,15 +13,6 @@ class CachingLocationListener<StorageLocation> implements LocationListener {
 		this.locationTransformer = locationTransformer;
 		this.locationStore = locationStore;
 	}
-
-	@Override
-	public void onStatusChanged(String provider, int status, Bundle extras) { }
-
-	@Override
-	public void onProviderEnabled(String provider) { }
-
-	@Override
-	public void onProviderDisabled(String provider) { }
 
 	@Override
 	public void onLocationChanged(Location location) {
