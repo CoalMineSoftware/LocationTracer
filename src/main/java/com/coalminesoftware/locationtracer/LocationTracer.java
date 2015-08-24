@@ -6,13 +6,11 @@ import android.content.Context;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
-import android.os.Looper;
 
 import com.coalminesoftware.locationtracer.alarm.IrregularRecurringAlarm;
 import com.coalminesoftware.locationtracer.alarm.RecurringAlarm;
 import com.coalminesoftware.locationtracer.caching.LocationStore;
 import com.coalminesoftware.locationtracer.listener.CachingLocationListener;
-import com.coalminesoftware.locationtracer.listener.DefaultLocationListener;
 import com.coalminesoftware.locationtracer.reporting.LocationReporter;
 import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 import com.coalminesoftware.locationtracer.transformation.PassthroughLocationTransformer;
@@ -24,7 +22,7 @@ public class LocationTracer<StorageLocation> {
 	private LocationReporter<StorageLocation> locationReporter;
 
 	private LocationListener locationListener;
-	private boolean listening;
+	private LocationListeningSession locationListeningSession;
 
 	private ReportingSession reportingSession;
 
@@ -54,7 +52,7 @@ public class LocationTracer<StorageLocation> {
 		String providerName = determineBestActiveLocationProviderName(getLocationManager());
 		getLocationManager().requestLocationUpdates(providerName, locationUpdateIntervalDuration, 0, locationListener);
 
-		listening = true;
+		locationListeningSession = new LocationListeningSession();
 	}
 
 	public synchronized void startListeningPassively(Long activeLocationRequestInterval, boolean wakeForActiveLocationRequests) {
@@ -62,68 +60,47 @@ public class LocationTracer<StorageLocation> {
 
 		getLocationManager().requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 0, 0, locationListener);
 
+		IrregularRecurringAlarm alarm = null;
 		if(activeLocationRequestInterval != null) {			
-			registerActiveLocationUpdate(activeLocationRequestInterval, wakeForActiveLocationRequests);
+			alarm = registerActiveLocationUpdate(activeLocationRequestInterval, wakeForActiveLocationRequests);
 		}
 
-		listening = true;
+		locationListeningSession = new LocationListeningSession(alarm);
 	}
 
 	private IrregularRecurringAlarm registerActiveLocationUpdate(final long activeLocationRequestInterval, boolean wakeForActiveLocationRequests) {
-		IrregularRecurringAlarm alarm = new IrregularRecurringAlarm(context, wakeForActiveLocationRequests) {
-			@Override
-			protected long determineNextAlarmDelay(long alarmElapsedRealtime) {
-				Long timeElapsedSinceLastLocation = determineTimeElapsedSinceLastLocation(alarmElapsedRealtime);
-				if(timeElapsedSinceLastLocation == null) {
-					return activeLocationRequestInterval;
-				}
-
-				long remainingTime = activeLocationRequestInterval - timeElapsedSinceLastLocation;
-				return remainingTime > 0? // TODO Verify that if this is the case, the check in (2) below evaluates as needed
-						remainingTime :
-						activeLocationRequestInterval;
-			}
-
-			@Override
-			public void handleAlarm(long alarmElapsedRealtime) {
-				Long timeElapsedSinceLastLocation = determineTimeElapsedSinceLastLocation(alarmElapsedRealtime);
-				if(timeElapsedSinceLastLocation == null ||
-						timeElapsedSinceLastLocation >= activeLocationRequestInterval) { // TODO (2)
-
-					// A no-op location listener is used to avoid duplicate updates.  The update this causes will be
-					// handled by the passive listener.
-					getLocationManager().requestSingleUpdate(
-							LocationManager.NETWORK_PROVIDER, // TODO Switch this back to GPS.
-							DefaultLocationListener.INSTANCE,
-							Looper.myLooper());
-				}
-			}
-
-			private Long determineTimeElapsedSinceLastLocation(long alarmElapsedRealtime) {
-				Long lastLocationObservationTimestamp = locationStore.getLastLocationOfferElapsedRealtime();
-				return lastLocationObservationTimestamp == null?
-						null :
-						alarmElapsedRealtime - lastLocationObservationTimestamp;
-			}
-		};
+		IrregularRecurringAlarm alarm = new ActiveLocationUpdateAlarm(context,
+				wakeForActiveLocationRequests,
+				activeLocationRequestInterval,
+				locationStore);
 
 		alarm.startRecurringAlarm();
 
 		return alarm;
 	}
 
+	private void verifyListeningInProgress() {
+		if(locationListeningSession == null) {
+			throw new IllegalStateException("Cannot stop listening when listening is not in progress.");
+		}
+	}
+
 	private void verifyListeningNotInProgress() {
-		if(listening) {
+		if(locationListeningSession != null) {
 			throw new IllegalStateException("Cannot start listening when listening is already in progress.");
 		}
 	}
 
 	public synchronized void stopListening() {
+		verifyListeningInProgress();
+
 		getLocationManager().removeUpdates(locationListener);
 
-		// TODO If active updates were requested when starting passive listening, cancel them here.
+		if(locationListeningSession.getActiveLocationUpdateAlarm() != null) {
+			locationListeningSession.getActiveLocationUpdateAlarm().stopRecurringAlarm();
+		}
 
-		listening = false;
+		locationListeningSession = null;
 	}
 
 	public void startReporting(long reportIntervalDuration, boolean wakeForReport) {
@@ -176,6 +153,20 @@ public class LocationTracer<StorageLocation> {
 
 		public RecurringAlarm getReportingAlarm() {
 			return reportingAlarm;
+		}
+	}
+
+	private class LocationListeningSession {
+		private IrregularRecurringAlarm activeLocationUpdateAlarm;
+
+		public LocationListeningSession() { }
+
+		public LocationListeningSession(IrregularRecurringAlarm activeLocationUpdateAlarm) {
+			this.activeLocationUpdateAlarm = activeLocationUpdateAlarm;
+		}
+
+		public IrregularRecurringAlarm getActiveLocationUpdateAlarm() {
+			return activeLocationUpdateAlarm;
 		}
 	}
 }
