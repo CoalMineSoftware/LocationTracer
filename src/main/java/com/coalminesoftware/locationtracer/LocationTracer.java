@@ -1,5 +1,6 @@
 package com.coalminesoftware.locationtracer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import android.content.Context;
@@ -11,6 +12,8 @@ import com.coalminesoftware.locationtracer.alarm.IrregularRecurringAlarm;
 import com.coalminesoftware.locationtracer.alarm.RecurringAlarm;
 import com.coalminesoftware.locationtracer.caching.LocationStore;
 import com.coalminesoftware.locationtracer.listener.CachingLocationListener;
+import com.coalminesoftware.locationtracer.provider.LocationProviderDeterminationStrategy;
+import com.coalminesoftware.locationtracer.provider.SimpleLocationProviderDeterminationStrategy;
 import com.coalminesoftware.locationtracer.reporting.LocationReporter;
 import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 import com.coalminesoftware.locationtracer.transformation.PassthroughLocationTransformer;
@@ -24,7 +27,11 @@ public class LocationTracer<StorageLocation> {
 	private LocationListener locationListener;
 	private LocationListeningSession locationListeningSession;
 
+	private LocationProviderDeterminationStrategy activeListeningProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.GPS_PROVIDER);
+	private LocationProviderDeterminationStrategy passiveListeningProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.NETWORK_PROVIDER);
+
 	private ReportingSession reportingSession;
+	private List<EventListener> eventListeners = new ArrayList<EventListener>();
 
 	private LocationTracer(Context context, LocationTransformer<StorageLocation> locationTransformer,
 			LocationStore<StorageLocation> locationStore, LocationReporter<StorageLocation> locationReporter) {
@@ -49,7 +56,7 @@ public class LocationTracer<StorageLocation> {
 	public synchronized void startListeningActively(long locationUpdateIntervalDuration) {
 		verifyListeningNotInProgress();
 
-		String providerName = determineBestActiveLocationProviderName(getLocationManager());
+		String providerName = activeListeningProviderStrategy.determineLocationProvider(getLocationManager());
 		getLocationManager().requestLocationUpdates(providerName, locationUpdateIntervalDuration, 0, locationListener);
 
 		locationListeningSession = new LocationListeningSession();
@@ -72,7 +79,8 @@ public class LocationTracer<StorageLocation> {
 		IrregularRecurringAlarm alarm = new ActiveLocationUpdateAlarm(context,
 				wakeForActiveLocationRequests,
 				activeLocationRequestInterval,
-				locationStore);
+				locationStore,
+				passiveListeningProviderStrategy);
 
 		alarm.startRecurringAlarm();
 
@@ -128,6 +136,14 @@ public class LocationTracer<StorageLocation> {
 		}
 	}
 
+	public void addEventListener(EventListener listener) {
+		eventListeners.add(listener);
+	}
+
+	public void removeEventListener(EventListener listener) {
+		eventListeners.remove(listener);
+	}
+
 	private void reportStoredLocations() {
 		if(locationStore.getLocationCount() > 0) {
 			List<StorageLocation> locations = locationStore.getLocations();
@@ -136,15 +152,11 @@ public class LocationTracer<StorageLocation> {
 		}
 	}
 
-	private String determineBestActiveLocationProviderName(LocationManager locationManager) {
-		return LocationManager.GPS_PROVIDER;
-	}
-
 	private LocationManager getLocationManager() {
 		return (LocationManager)context.getSystemService(Context.LOCATION_SERVICE);
 	}
 
-	private class ReportingSession {
+	private static class ReportingSession {
 		private RecurringAlarm reportingAlarm;
 
 		public ReportingSession(RecurringAlarm reportingAlarm) {
@@ -156,7 +168,7 @@ public class LocationTracer<StorageLocation> {
 		}
 	}
 
-	private class LocationListeningSession {
+	private static class LocationListeningSession {
 		private IrregularRecurringAlarm activeLocationUpdateAlarm;
 
 		public LocationListeningSession() { }

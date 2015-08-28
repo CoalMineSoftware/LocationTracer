@@ -7,39 +7,47 @@ import android.os.Looper;
 import com.coalminesoftware.locationtracer.alarm.IrregularRecurringAlarm;
 import com.coalminesoftware.locationtracer.caching.LocationStore;
 import com.coalminesoftware.locationtracer.listener.DefaultLocationListener;
+import com.coalminesoftware.locationtracer.provider.LocationProviderDeterminationStrategy;
 
 public class ActiveLocationUpdateAlarm extends IrregularRecurringAlarm {
-	private long locationUpdateInterval;
+	private long locationUpdateIntervalDuration;
 	private LocationStore<?> locationStore;
+	private LocationProviderDeterminationStrategy locationProviderDeterminationStrategy;
 
-	public ActiveLocationUpdateAlarm(Context context, boolean wakeForAlarm, long locationUpdateInterval, LocationStore<?> locationStore) {
+	public ActiveLocationUpdateAlarm(Context context,
+			boolean wakeForAlarm,
+			long locationUpdateIntervalDuration,
+			LocationStore<?> locationStore,
+			LocationProviderDeterminationStrategy locationProviderDeterminationStrategy) {
 		super(context, wakeForAlarm);
 
-		this.locationUpdateInterval = locationUpdateInterval;
+		this.locationUpdateIntervalDuration = locationUpdateIntervalDuration;
 		this.locationStore = locationStore;
+		this.locationProviderDeterminationStrategy = locationProviderDeterminationStrategy;
 	}
 
 	@Override
-	protected long determineNextAlarmDelay(long alarmElapsedRealtime) {
-		Long timeElapsed = determineRealtimeElapsedSinceLastLocation(alarmElapsedRealtime);
+	protected long determineNextAlarmDelay(long alarmTime) {
+		Long timeElapsed = determineTimeElapsedSinceLastLocationUpdate(alarmTime);
 		return timeElapsed == null || hasAlarmExpired(timeElapsed)?
-				locationUpdateInterval :
+				locationUpdateIntervalDuration :
 				determineRemainingTime(timeElapsed);
 	}
 
 	@Override
-	public void handleAlarm(long alarmRealtime) {
-		Long timeElapsed = determineRealtimeElapsedSinceLastLocation(alarmRealtime);
+	public void handleAlarm(long alarmTime) {
+		Long timeElapsed = determineTimeElapsedSinceLastLocationUpdate(alarmTime);
 		if(timeElapsed == null || hasAlarmExpired(timeElapsed)) {
-			// Since a passive listener is already registered, a no-op location listener is used to avoid offering duplicate updates to the cache.
+			// Since a passive listener is already listening for the location update that this request hopes to cause,
+			// a no-op location listener is used to avoid offering duplicate updates to the cache.
 			getLocationManager().requestSingleUpdate(
-					LocationManager.NETWORK_PROVIDER, // TODO Switch this back to GPS.
+					locationProviderDeterminationStrategy.determineLocationProvider(getLocationManager()),
 					DefaultLocationListener.INSTANCE,
 					Looper.myLooper());
 		}
 	}
 
-	private Long determineRealtimeElapsedSinceLastLocation(long alarmElapsedRealtime) {
+	private Long determineTimeElapsedSinceLastLocationUpdate(long alarmElapsedRealtime) {
 		Long lastLocationObservationTimestamp = locationStore.getLastLocationOfferElapsedRealtime();
 		return lastLocationObservationTimestamp == null?
 				null :
@@ -47,11 +55,11 @@ public class ActiveLocationUpdateAlarm extends IrregularRecurringAlarm {
 	}
 
 	private long determineRemainingTime(long timeElapsed) {
-		return locationUpdateInterval - timeElapsed;
+		return locationUpdateIntervalDuration - timeElapsed;
 	}
 
 	private boolean hasAlarmExpired(long timeElapsed) {
-		return timeElapsed < locationUpdateInterval;
+		return timeElapsed >= locationUpdateIntervalDuration;
 	}
 
 	private LocationManager getLocationManager() {
