@@ -6,18 +6,13 @@ import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
 
-import android.os.SystemClock;
-
 /**
  * A location store that retains no more than a given number of locations.  Once the store's capacity is reached, excess
  * locations are removed in the order they were offered to the store.
- * 
- * @param <StorageLocation>
  */
 public class InMemoryLocationStore<StorageLocation> implements LocationStore<StorageLocation> {
 	private Deque<StorageLocation> locations = new LinkedList<StorageLocation>();
 	private int locationCountLimit;
-	private Long lastLocationOfferElapsedRealtime;
 
 	public InMemoryLocationStore(int locationCountLimit) {
 		this.locationCountLimit = locationCountLimit;
@@ -25,8 +20,6 @@ public class InMemoryLocationStore<StorageLocation> implements LocationStore<Sto
 
 	@Override
 	public void offerLocation(StorageLocation location) {
-		lastLocationOfferElapsedRealtime = SystemClock.elapsedRealtime();
-
 		locations.addLast(location);
 
 		while(locations.size() > locationCountLimit) {
@@ -55,10 +48,5 @@ public class InMemoryLocationStore<StorageLocation> implements LocationStore<Sto
 	@Override
 	public void removeLocations(Collection<StorageLocation> locations) {
 		this.locations.removeAll(locations);
-	}
-
-	@Override
-	public Long getLastLocationOfferElapsedRealtime() {
-		return lastLocationOfferElapsedRealtime;
 	}
 }

@@ -13,5 +13,4 @@ public interface LocationStore<StorageLocation> {
 	int getLocationCount();
 	List<StorageLocation> getLocations();
 	void removeLocations(Collection<StorageLocation> locations);
-	Long getLastLocationOfferElapsedRealtime();
 }

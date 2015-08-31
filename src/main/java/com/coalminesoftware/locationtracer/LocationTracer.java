@@ -5,13 +5,14 @@ import java.util.List;
 
 import android.content.Context;
 import android.location.Location;
-import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.Looper;
 
 import com.coalminesoftware.locationtracer.alarm.IrregularRecurringAlarm;
 import com.coalminesoftware.locationtracer.alarm.RecurringAlarm;
 import com.coalminesoftware.locationtracer.caching.LocationStore;
 import com.coalminesoftware.locationtracer.listener.CachingLocationListener;
+import com.coalminesoftware.locationtracer.listener.DefaultLocationListener;
 import com.coalminesoftware.locationtracer.provider.LocationProviderDeterminationStrategy;
 import com.coalminesoftware.locationtracer.provider.SimpleLocationProviderDeterminationStrategy;
 import com.coalminesoftware.locationtracer.reporting.LocationReporter;
@@ -24,7 +25,7 @@ public class LocationTracer<StorageLocation> {
 	private LocationStore<StorageLocation> locationStore;
 	private LocationReporter<StorageLocation> locationReporter;
 
-	private LocationListener locationListener;
+	private CachingLocationListener<?> locationListener;
 	private LocationListeningSession locationListeningSession;
 
 	private LocationProviderDeterminationStrategy activeListeningProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.GPS_PROVIDER);
@@ -75,12 +76,8 @@ public class LocationTracer<StorageLocation> {
 		locationListeningSession = new LocationListeningSession(alarm);
 	}
 
-	private IrregularRecurringAlarm registerActiveLocationUpdate(final long activeLocationRequestInterval, boolean wakeForActiveLocationRequests) {
-		IrregularRecurringAlarm alarm = new ActiveLocationUpdateAlarm(context,
-				wakeForActiveLocationRequests,
-				activeLocationRequestInterval,
-				locationStore,
-				passiveListeningProviderStrategy);
+	private IrregularRecurringAlarm registerActiveLocationUpdate(long activeLocationRequestInterval, boolean wakeForActiveLocationRequests) {
+		IrregularRecurringAlarm alarm = new ActiveLocationUpdateAlarm(wakeForActiveLocationRequests, activeLocationRequestInterval);
 
 		alarm.startRecurringAlarm();
 
@@ -179,6 +176,53 @@ public class LocationTracer<StorageLocation> {
 
 		public IrregularRecurringAlarm getActiveLocationUpdateAlarm() {
 			return activeLocationUpdateAlarm;
+		}
+	}
+
+	public class ActiveLocationUpdateAlarm extends IrregularRecurringAlarm {
+		private long locationUpdateIntervalDuration;
+
+		public ActiveLocationUpdateAlarm(boolean wakeForAlarm, long locationUpdateIntervalDuration) {
+			super(context, wakeForAlarm);
+
+			this.locationUpdateIntervalDuration = locationUpdateIntervalDuration;
+		}
+
+		@Override
+		protected long determineNextAlarmDelay(long alarmTime) {
+			Long timeElapsed = determineTimeElapsedSinceLastLocationUpdate(alarmTime);
+			return timeElapsed == null || hasAlarmExpired(timeElapsed)?
+					locationUpdateIntervalDuration :
+					determineRemainingTime(timeElapsed);
+		}
+
+		@Override
+		public void handleAlarm(long alarmTime) {
+			Long timeElapsed = determineTimeElapsedSinceLastLocationUpdate(alarmTime);
+			if(timeElapsed == null || hasAlarmExpired(timeElapsed)) {
+				// Since a passive listener is already listening for the location update that this request hopes to
+				// cause, a no-op location listener is used to avoid offering duplicate updates to the cache.
+				getLocationManager().requestSingleUpdate(
+						passiveListeningProviderStrategy.determineLocationProvider(getLocationManager()),
+						DefaultLocationListener.INSTANCE,
+						Looper.myLooper());
+			}
+		}
+
+		private Long determineTimeElapsedSinceLastLocationUpdate(long alarmElapsedRealtime) {
+			// TODO Should this be based on the time that the last location was offered or accepted?
+			Long lastLocationObservationTimestamp = locationListener.getLastLocationObservationTime();
+			return lastLocationObservationTimestamp == null?
+					null :
+					alarmElapsedRealtime - lastLocationObservationTimestamp;
+		}
+
+		private long determineRemainingTime(long timeElapsed) {
+			return locationUpdateIntervalDuration - timeElapsed;
+		}
+
+		private boolean hasAlarmExpired(long timeElapsed) {
+			return timeElapsed >= locationUpdateIntervalDuration;
 		}
 	}
 }
