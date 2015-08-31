@@ -15,18 +15,18 @@ public abstract class IrregularRecurringAlarm extends BaseRecurringAlarm {
 	protected abstract long determineNextAlarmDelay(long alarmElapsedRealtime);
 
 	@Override
+	public void onReceive(Context context, Intent intent) {
+		long elapsedRealtime = SystemClock.elapsedRealtime();
+
+		handleAlarm(elapsedRealtime);
+		scheduleAlarm(elapsedRealtime);
+	}
+
+	@Override
 	protected void scheduleAlarm(long alarmElapsedRealtime) {
 		getAlarmManager(getContext()).set(
 				getAlarmType(),
 				SystemClock.elapsedRealtime() + determineNextAlarmDelay(alarmElapsedRealtime),
 				getAlarmPendingIntent());
-	}
-
-	@Override
-	public void onReceive(Context context, Intent intent) {
-		long elapsedRealtime = SystemClock.elapsedRealtime();
- 
-		handleAlarm(elapsedRealtime);
-		scheduleAlarm(elapsedRealtime);
 	}
 }

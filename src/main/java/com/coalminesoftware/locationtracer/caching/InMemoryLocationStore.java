@@ -10,7 +10,7 @@ import java.util.List;
  * A location store that retains no more than a given number of locations.  Once the store's capacity is reached, excess
  * locations are removed in the order they were offered to the store.
  */
-public class InMemoryLocationStore<StorageLocation> implements LocationStore<StorageLocation> {
+public class InMemoryLocationStore<StorageLocation> extends BaseLocationStore<StorageLocation> {
 	private Deque<StorageLocation> locations = new LinkedList<StorageLocation>();
 	private int locationCountLimit;
 
@@ -21,6 +21,7 @@ public class InMemoryLocationStore<StorageLocation> implements LocationStore<Sto
 	@Override
 	public void offerLocation(StorageLocation location) {
 		locations.addLast(location);
+		updateLastAcceptedLocationTime();
 
 		while(locations.size() > locationCountLimit) {
 			StorageLocation removedLocation = locations.removeFirst();

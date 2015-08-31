@@ -5,6 +5,7 @@ import java.util.List;
 
 import android.content.Context;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Looper;
 
@@ -25,7 +26,7 @@ public class LocationTracer<StorageLocation> {
 	private LocationStore<StorageLocation> locationStore;
 	private LocationReporter<StorageLocation> locationReporter;
 
-	private CachingLocationListener<?> locationListener;
+	private LocationListener locationListener;
 	private LocationListeningSession locationListeningSession;
 
 	private LocationProviderDeterminationStrategy activeListeningProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.GPS_PROVIDER);
@@ -190,7 +191,7 @@ public class LocationTracer<StorageLocation> {
 
 		@Override
 		protected long determineNextAlarmDelay(long alarmTime) {
-			Long timeElapsed = determineTimeElapsedSinceLastLocationUpdate(alarmTime);
+			Long timeElapsed = determineTimeElapsedSinceLastLocationAcceptance(alarmTime);
 			return timeElapsed == null || hasAlarmExpired(timeElapsed)?
 					locationUpdateIntervalDuration :
 					determineRemainingTime(timeElapsed);
@@ -198,10 +199,10 @@ public class LocationTracer<StorageLocation> {
 
 		@Override
 		public void handleAlarm(long alarmTime) {
-			Long timeElapsed = determineTimeElapsedSinceLastLocationUpdate(alarmTime);
+			Long timeElapsed = determineTimeElapsedSinceLastLocationAcceptance(alarmTime);
 			if(timeElapsed == null || hasAlarmExpired(timeElapsed)) {
-				// Since a passive listener is already listening for the location update that this request hopes to
-				// cause, a no-op location listener is used to avoid offering duplicate updates to the cache.
+				// Since a passive listener should already be listening for the location update that this request hopes
+				// to cause, a no-op location listener is used to avoid offering duplicate updates to the cache.
 				getLocationManager().requestSingleUpdate(
 						passiveListeningProviderStrategy.determineLocationProvider(getLocationManager()),
 						DefaultLocationListener.INSTANCE,
@@ -209,12 +210,11 @@ public class LocationTracer<StorageLocation> {
 			}
 		}
 
-		private Long determineTimeElapsedSinceLastLocationUpdate(long alarmElapsedRealtime) {
-			// TODO Should this be based on the time that the last location was offered or accepted?
-			Long lastLocationObservationTimestamp = locationListener.getLastLocationObservationTime();
-			return lastLocationObservationTimestamp == null?
+		private Long determineTimeElapsedSinceLastLocationAcceptance(long alarmElapsedRealtime) {
+			Long lastLocationAcceptanceTime = locationStore.getLastLocationAcceptanceTime();
+			return lastLocationAcceptanceTime == null?
 					null :
-					alarmElapsedRealtime - lastLocationObservationTimestamp;
+					alarmElapsedRealtime - lastLocationAcceptanceTime;
 		}
 
 		private long determineRemainingTime(long timeElapsed) {
