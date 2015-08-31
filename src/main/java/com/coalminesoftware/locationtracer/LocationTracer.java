@@ -27,12 +27,13 @@ public class LocationTracer<StorageLocation> {
 	private LocationReporter<StorageLocation> locationReporter;
 
 	private LocationListener locationListener;
-	private LocationListeningSession locationListeningSession;
+	private ListeningSession locationListeningSession;
 
 	private LocationProviderDeterminationStrategy activeListeningProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.GPS_PROVIDER);
 	private LocationProviderDeterminationStrategy passiveListeningProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.NETWORK_PROVIDER);
 
 	private ReportingSession reportingSession;
+
 	private List<EventListener> eventListeners = new ArrayList<EventListener>();
 
 	private LocationTracer(Context context, LocationTransformer<StorageLocation> locationTransformer,
@@ -61,7 +62,7 @@ public class LocationTracer<StorageLocation> {
 		String providerName = activeListeningProviderStrategy.determineLocationProvider(getLocationManager());
 		getLocationManager().requestLocationUpdates(providerName, locationUpdateIntervalDuration, 0, locationListener);
 
-		locationListeningSession = new LocationListeningSession();
+		locationListeningSession = new ListeningSession();
 	}
 
 	public synchronized void startListeningPassively(Long activeLocationRequestInterval, boolean wakeForActiveLocationRequests) {
@@ -74,7 +75,13 @@ public class LocationTracer<StorageLocation> {
 			alarm = registerActiveLocationUpdate(activeLocationRequestInterval, wakeForActiveLocationRequests);
 		}
 
-		locationListeningSession = new LocationListeningSession(alarm);
+		locationListeningSession = new ListeningSession(alarm);
+	}
+
+	private void verifyListeningNotInProgress() {
+		if(locationListeningSession != null) {
+			throw new IllegalStateException("Cannot start listening when listening is already in progress.");
+		}
 	}
 
 	private IrregularRecurringAlarm registerActiveLocationUpdate(long activeLocationRequestInterval, boolean wakeForActiveLocationRequests) {
@@ -83,18 +90,6 @@ public class LocationTracer<StorageLocation> {
 		alarm.startRecurringAlarm();
 
 		return alarm;
-	}
-
-	private void verifyListeningInProgress() {
-		if(locationListeningSession == null) {
-			throw new IllegalStateException("Cannot stop listening when listening is not in progress.");
-		}
-	}
-
-	private void verifyListeningNotInProgress() {
-		if(locationListeningSession != null) {
-			throw new IllegalStateException("Cannot start listening when listening is already in progress.");
-		}
 	}
 
 	public synchronized void stopListening() {
@@ -107,6 +102,12 @@ public class LocationTracer<StorageLocation> {
 		}
 
 		locationListeningSession = null;
+	}
+
+	private void verifyListeningInProgress() {
+		if(locationListeningSession == null) {
+			throw new IllegalStateException("Cannot stop listening when listening is not in progress.");
+		}
 	}
 
 	public void startReporting(long reportIntervalDuration, boolean wakeForReport) {
@@ -166,12 +167,12 @@ public class LocationTracer<StorageLocation> {
 		}
 	}
 
-	private static class LocationListeningSession {
+	private static class ListeningSession {
 		private IrregularRecurringAlarm activeLocationUpdateAlarm;
 
-		public LocationListeningSession() { }
+		public ListeningSession() { }
 
-		public LocationListeningSession(IrregularRecurringAlarm activeLocationUpdateAlarm) {
+		public ListeningSession(IrregularRecurringAlarm activeLocationUpdateAlarm) {
 			this.activeLocationUpdateAlarm = activeLocationUpdateAlarm;
 		}
 
