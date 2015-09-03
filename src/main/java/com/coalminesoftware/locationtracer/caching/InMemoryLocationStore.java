@@ -23,6 +23,10 @@ public class InMemoryLocationStore<StorageLocation> extends BaseLocationStore<St
 		locations.addLast(location);
 		updateLastAcceptedLocationTime();
 
+		purgeExcessLocations();
+	}
+
+	private void purgeExcessLocations() {
 		while(locations.size() > locationCountLimit) {
 			StorageLocation removedLocation = locations.removeFirst();
 			onLocationPurged(removedLocation);

@@ -2,6 +2,10 @@ package com.coalminesoftware.locationtracer.provider;
 
 import android.location.LocationManager;
 
+/**
+ * A {@link LocationProviderDeterminationStrategy} implementation that simply returns the name provided during an
+ * instance's construction.
+ */
 public class SimpleLocationProviderDeterminationStrategy implements LocationProviderDeterminationStrategy {
 	private String providerName;
 

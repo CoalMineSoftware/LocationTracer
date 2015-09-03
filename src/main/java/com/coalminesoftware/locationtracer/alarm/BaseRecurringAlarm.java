@@ -10,20 +10,20 @@ import android.os.SystemClock;
 
 public abstract class BaseRecurringAlarm extends BroadcastReceiver {
 	private static final String BASE_ALARM_ACTION = "com.coalminesoftware.locationtracer.TRIGGER_RECURRING_ALARM";
-	private static int INSTANCE_COUNT = 0;
+	private static int GENERATED_ACTION_COUNT = 0;
 
 	private Context context;
 	private int alarmType;
 
-	private String alarmIntentAction;
-	private PendingIntent alarmPendingIntent;
+	private String alarmAction;
+	private PendingIntent alarmIntent;
 
 	public BaseRecurringAlarm(Context context, boolean wakeForAlarm) {
 		this.context = context.getApplicationContext();
 		this.alarmType = determineAlarmType(wakeForAlarm);
 
-		alarmIntentAction = generateIntentAction(context);
-		alarmPendingIntent = buildPendingIntent(context, alarmIntentAction);
+		alarmAction = generateAction(context);
+		alarmIntent = buildPendingIntent(context, alarmAction);
 	}
 
 	public abstract void handleAlarm(long alarmElapsedRealtime);
@@ -44,7 +44,7 @@ public abstract class BaseRecurringAlarm extends BroadcastReceiver {
 	}
 
 	private void registerAlarmReceiver() {
-		context.registerReceiver(this, new IntentFilter(alarmIntentAction));
+		context.registerReceiver(this, new IntentFilter(alarmAction));
 	}
 
 	private void unregisterAlarmReceiver() {
@@ -58,7 +58,7 @@ public abstract class BaseRecurringAlarm extends BroadcastReceiver {
 	}
 
 	private void cancelAlarm() {
-		getAlarmManager(context).cancel(alarmPendingIntent);
+		getAlarmManager(context).cancel(alarmIntent);
 	}
 
 	protected static AlarmManager getAlarmManager(Context context) {
@@ -69,18 +69,18 @@ public abstract class BaseRecurringAlarm extends BroadcastReceiver {
 		return context;
 	}
 
-	public int getAlarmType() {
+	protected int getAlarmType() {
 		return alarmType;
 	}
 
 	protected PendingIntent getAlarmPendingIntent() {
-		return alarmPendingIntent;
+		return alarmIntent;
 	}
 
-	private static String generateIntentAction(Context context) {
+	private static String generateAction(Context context) {
 		return context.getPackageName() + "/" +
 				BASE_ALARM_ACTION + "/" +
-				INSTANCE_COUNT++;
+				GENERATED_ACTION_COUNT++;
 	}
 
 	private static PendingIntent buildPendingIntent(Context context, String action) {

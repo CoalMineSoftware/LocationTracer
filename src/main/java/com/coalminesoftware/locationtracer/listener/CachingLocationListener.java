@@ -6,6 +6,12 @@ import android.os.SystemClock;
 import com.coalminesoftware.locationtracer.caching.LocationStore;
 import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 
+/**
+ * Listener that transforms observed {@link Location} updates using the provided {@link LocationTransformer} and stores
+ * the resulting model object in the given {@link LocationStore}.
+ *
+ * @param <StorageLocation> The type that Locations will be transformed into and stored as.
+ */
 public class CachingLocationListener<StorageLocation> extends DefaultLocationListener {
 	private LocationTransformer<StorageLocation> locationTransformer;
 	private LocationStore<StorageLocation> locationStore;

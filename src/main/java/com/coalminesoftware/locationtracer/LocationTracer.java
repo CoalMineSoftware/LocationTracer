@@ -28,10 +28,12 @@ public class LocationTracer<StorageLocation> {
 	private LocationListener locationListener;
 	private ListeningSession locationListeningSession;
 
-	private LocationProviderDeterminationStrategy activeListeningProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.GPS_PROVIDER);
-	private LocationProviderDeterminationStrategy passiveListeningProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.GPS_PROVIDER);
+	private LocationProviderDeterminationStrategy activeListeningLocationProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.GPS_PROVIDER);
+	private LocationProviderDeterminationStrategy passiveListeningLocationProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.GPS_PROVIDER);
 
 	private ReportingSession reportingSession;
+
+	private float minimumLocationUpdateDistance = 0f; // TODO The minimum distance and time used for location updates should be configurable but with reasonable defaults.
 
 	private LocationTracer(Context context, LocationTransformer<StorageLocation> locationTransformer,
 			LocationStore<StorageLocation> locationStore, LocationReporter<StorageLocation> locationReporter) {
@@ -56,8 +58,11 @@ public class LocationTracer<StorageLocation> {
 	public synchronized void startListeningActively(long locationUpdateIntervalDuration) {
 		verifyListeningNotInProgress();
 
-		String providerName = activeListeningProviderStrategy.determineLocationProvider(getLocationManager());
-		getLocationManager().requestLocationUpdates(providerName, locationUpdateIntervalDuration, 0, locationListener);
+		String providerName = activeListeningLocationProviderStrategy.determineLocationProvider(getLocationManager());
+		getLocationManager().requestLocationUpdates(providerName,
+				locationUpdateIntervalDuration,
+				minimumLocationUpdateDistance,
+				locationListener);
 
 		locationListeningSession = new ListeningSession();
 	}
@@ -65,12 +70,14 @@ public class LocationTracer<StorageLocation> {
 	public synchronized void startListeningPassively(Long activeLocationRequestInterval, boolean wakeForActiveLocationRequests) {
 		verifyListeningNotInProgress();
 
-		getLocationManager().requestLocationUpdates(LocationManager.PASSIVE_PROVIDER, 0, 0, locationListener);
+		getLocationManager().requestLocationUpdates(LocationManager.PASSIVE_PROVIDER,
+				0,
+				0,
+				locationListener);
 
-		IrregularRecurringAlarm alarm = null;
-		if(activeLocationRequestInterval != null) {			
-			alarm = startActiveLocationUpdateAlarm(activeLocationRequestInterval, wakeForActiveLocationRequests);
-		}
+		IrregularRecurringAlarm alarm = activeLocationRequestInterval == null?
+				null :
+				startActiveLocationUpdateAlarm(activeLocationRequestInterval, wakeForActiveLocationRequests);
 
 		locationListeningSession = new ListeningSession(alarm);
 	}
@@ -194,17 +201,17 @@ public class LocationTracer<StorageLocation> {
 				// Since a passive listener should already be listening for the location update that this request hopes
 				// to cause, a no-op location listener is used to avoid offering duplicate updates to the cache.
 				getLocationManager().requestSingleUpdate(
-						passiveListeningProviderStrategy.determineLocationProvider(getLocationManager()),
+						passiveListeningLocationProviderStrategy.determineLocationProvider(getLocationManager()),
 						DefaultLocationListener.INSTANCE,
 						Looper.myLooper());
 			}
 		}
 
-		private Long determineTimeElapsedSinceLastLocationAcceptance(long alarmElapsedRealtime) {
+		private Long determineTimeElapsedSinceLastLocationAcceptance(long alarmTime) {
 			Long lastLocationAcceptanceTime = locationStore.getLastLocationAcceptanceTime();
 			return lastLocationAcceptanceTime == null?
 					null :
-					alarmElapsedRealtime - lastLocationAcceptanceTime;
+					alarmTime - lastLocationAcceptanceTime;
 		}
 
 		private long determineRemainingTime(long timeElapsed) {
