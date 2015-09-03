@@ -5,7 +5,7 @@ import android.content.Intent;
 import android.os.SystemClock;
 
 /**
- * An alarm that repeats at an irregular interval, determined by {@link #determineNextAlarmDelay()}.
+ * An alarm that repeats at an irregular interval, determined by {@link #determineNextAlarmDelay(long)}.
  */
 public abstract class IrregularRecurringAlarm extends BaseRecurringAlarm {
 	public IrregularRecurringAlarm(Context context, boolean wakeForAlarm) {
