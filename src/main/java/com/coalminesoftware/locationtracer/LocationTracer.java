@@ -1,6 +1,5 @@
 package com.coalminesoftware.locationtracer;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import android.content.Context;
@@ -30,11 +29,9 @@ public class LocationTracer<StorageLocation> {
 	private ListeningSession locationListeningSession;
 
 	private LocationProviderDeterminationStrategy activeListeningProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.GPS_PROVIDER);
-	private LocationProviderDeterminationStrategy passiveListeningProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.NETWORK_PROVIDER);
+	private LocationProviderDeterminationStrategy passiveListeningProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.GPS_PROVIDER);
 
 	private ReportingSession reportingSession;
-
-	private List<EventListener> eventListeners = new ArrayList<EventListener>();
 
 	private LocationTracer(Context context, LocationTransformer<StorageLocation> locationTransformer,
 			LocationStore<StorageLocation> locationStore, LocationReporter<StorageLocation> locationReporter) {
@@ -72,7 +69,7 @@ public class LocationTracer<StorageLocation> {
 
 		IrregularRecurringAlarm alarm = null;
 		if(activeLocationRequestInterval != null) {			
-			alarm = registerActiveLocationUpdate(activeLocationRequestInterval, wakeForActiveLocationRequests);
+			alarm = startActiveLocationUpdateAlarm(activeLocationRequestInterval, wakeForActiveLocationRequests);
 		}
 
 		locationListeningSession = new ListeningSession(alarm);
@@ -84,7 +81,7 @@ public class LocationTracer<StorageLocation> {
 		}
 	}
 
-	private IrregularRecurringAlarm registerActiveLocationUpdate(long activeLocationRequestInterval, boolean wakeForActiveLocationRequests) {
+	private IrregularRecurringAlarm startActiveLocationUpdateAlarm(long activeLocationRequestInterval, boolean wakeForActiveLocationRequests) {
 		IrregularRecurringAlarm alarm = new ActiveLocationUpdateAlarm(wakeForActiveLocationRequests, activeLocationRequestInterval);
 
 		alarm.startRecurringAlarm();
@@ -133,14 +130,6 @@ public class LocationTracer<StorageLocation> {
 		if(reportUnreportedLocations) {
 			reportStoredLocations();
 		}
-	}
-
-	public void addEventListener(EventListener listener) {
-		eventListeners.add(listener);
-	}
-
-	public void removeEventListener(EventListener listener) {
-		eventListeners.remove(listener);
 	}
 
 	private void reportStoredLocations() {
