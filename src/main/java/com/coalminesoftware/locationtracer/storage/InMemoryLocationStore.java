@@ -36,9 +36,9 @@ public class InMemoryLocationStore<StorageLocation> extends BaseLocationStore<St
 	/**
 	 * Called when an excess location is purged from the cache.
 	 * 
-	 * @param removedLocation The location that was removed.
+	 * @param purgedLocation The location that was removed.
 	 */
-	protected void onLocationPurged(StorageLocation removedLocation) { }
+	protected void onLocationPurged(StorageLocation purgedLocation) { }
 
 	@Override
 	public int getLocationCount() {

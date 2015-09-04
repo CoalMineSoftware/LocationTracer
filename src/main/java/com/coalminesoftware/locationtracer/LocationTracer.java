@@ -6,6 +6,7 @@ import android.content.Context;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.location.LocationProvider;
 import android.os.Looper;
 
 import com.coalminesoftware.locationtracer.alarm.IrregularRecurringAlarm;
@@ -20,20 +21,21 @@ import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 import com.coalminesoftware.locationtracer.transformation.PassthroughLocationTransformer;
 
 public class LocationTracer<StorageLocation> {
+	private static final long DEFAULT_MINIMUM_LOCATION_UPDATE_INTERVAL_DURATION = 1000;
+	private static final float DEFAULT_MINIMUM_LOCATION_UPDATE_DISTANCE = 0.0f;
+
 	private Context context;
 
 	private LocationStore<StorageLocation> locationStore;
 	private LocationReporter<StorageLocation> locationReporter;
 
 	private LocationListener locationListener;
+
 	private ListeningSession locationListeningSession;
-
-	private LocationProviderDeterminationStrategy activeListeningLocationProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.GPS_PROVIDER);
-	private LocationProviderDeterminationStrategy passiveListeningLocationProviderStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.GPS_PROVIDER);
-
 	private ReportingSession reportingSession;
 
-	private float minimumLocationUpdateDistance = 0f; // TODO The minimum distance and time used for location updates should be configurable but with reasonable defaults.
+	private LocationProviderDeterminationStrategy activeListeningLocationProviderDeterminationStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.GPS_PROVIDER);
+	private LocationProviderDeterminationStrategy passiveListeningLocationProviderDeterminationStrategy = new SimpleLocationProviderDeterminationStrategy(LocationManager.GPS_PROVIDER);
 
 	private LocationTracer(Context context, LocationTransformer<StorageLocation> locationTransformer,
 			LocationStore<StorageLocation> locationStore, LocationReporter<StorageLocation> locationReporter) {
@@ -55,24 +57,82 @@ public class LocationTracer<StorageLocation> {
 		return new LocationTracer<StorageLocation>(context, locationTransformer, locationStore, locationReporter);
 	}
 
-	public synchronized void startListeningActively(long locationUpdateIntervalDuration) {
+	/**
+	 * Starts actively requesting location updates with a minimum update interval of one second and no minimum distance.
+	 * 
+	 * @see #startListeningActively(long, float)
+	 */
+	public void startListeningActively() {
+		startListeningActively(
+				DEFAULT_MINIMUM_LOCATION_UPDATE_INTERVAL_DURATION,
+				DEFAULT_MINIMUM_LOCATION_UPDATE_DISTANCE);
+	}
+
+	/**
+	 * Starts actively requesting location updates with the specified minimum update interval and distance.
+	 * @param minimumLocationUpdateIntervalDuration The minimum number of milliseconds requested between location updates.
+	 * @param minimumLocationUpdateDistance The minimum displacement, in meters, that needs to exist between a location and the preceding location.
+	 */
+	public synchronized void startListeningActively(long minimumLocationUpdateIntervalDuration,
+			float minimumLocationUpdateDistance) {
 		verifyListeningNotInProgress();
 
-		String providerName = activeListeningLocationProviderStrategy.determineLocationProvider(getLocationManager());
-		getLocationManager().requestLocationUpdates(providerName,
-				locationUpdateIntervalDuration,
+		String providerName = activeListeningLocationProviderDeterminationStrategy
+				.determineLocationProvider(getLocationManager());
+
+		getLocationManager().requestLocationUpdates(
+				providerName,
+				minimumLocationUpdateIntervalDuration,
 				minimumLocationUpdateDistance,
 				locationListener);
 
 		locationListeningSession = new ListeningSession();
 	}
 
-	public synchronized void startListeningPassively(Long activeLocationRequestInterval, boolean wakeForActiveLocationRequests) {
+	/**
+	 * Starts passively listening for location updates that happen at the request of other code.
+	 * @param wakeForActiveLocationRequests
+	 */
+	public void startListeningPassively(boolean wakeForActiveLocationRequests) {
+		startListeningPassively(
+				DEFAULT_MINIMUM_LOCATION_UPDATE_INTERVAL_DURATION,
+				DEFAULT_MINIMUM_LOCATION_UPDATE_DISTANCE,
+				null,
+				false);
+	}
+
+	/**
+	 * Starts passively listening for location updates that happen at the request of other code. If a location update is
+	 * not received within a certain amount of time, a location is actively requested.
+	 * 
+	 * @param minimumLocationUpdateIntervalDuration The minimum number of milliseconds requested between location updates. 
+	 * @param minimumLocationUpdateDistance The minimum displacement, in meters, that needs to exist between a location and the preceding location.
+	 * @param activeLocationRequestInterval How long to wait since the last location update before actively requesting another. 
+	 * @param wakeForActiveLocationRequests Whether to wake the device when requesting active location updates.
+	 */
+	public void startListeningPassively(
+			long minimumLocationUpdateIntervalDuration,
+			float minimumLocationUpdateDistance,
+			long activeLocationRequestInterval,
+			boolean wakeForActiveLocationRequests) {
+		startListeningPassively(
+				minimumLocationUpdateIntervalDuration,
+				minimumLocationUpdateDistance,
+				(Long)activeLocationRequestInterval,
+				wakeForActiveLocationRequests);
+	}
+
+	private synchronized void startListeningPassively(
+			long minimumLocationUpdateIntervalDuration,
+			float minimumLocationUpdateDistance,
+			Long activeLocationRequestInterval,
+			boolean wakeForActiveLocationRequests) {
 		verifyListeningNotInProgress();
 
-		getLocationManager().requestLocationUpdates(LocationManager.PASSIVE_PROVIDER,
-				0,
-				0,
+		getLocationManager().requestLocationUpdates(
+				LocationManager.PASSIVE_PROVIDER,
+				minimumLocationUpdateIntervalDuration,
+				minimumLocationUpdateDistance,
 				locationListener);
 
 		IrregularRecurringAlarm alarm = activeLocationRequestInterval == null?
@@ -114,7 +174,7 @@ public class LocationTracer<StorageLocation> {
 		}
 	}
 
-	public void startReporting(long reportIntervalDuration, boolean wakeForReport) {
+	public synchronized void startReporting(long reportIntervalDuration, boolean wakeForReport) {
 		if(reportingSession != null) {
 			throw new IllegalStateException("Cannot start reporting when reporting is already in progress.");
 		}
@@ -130,7 +190,7 @@ public class LocationTracer<StorageLocation> {
 		reportingSession = new ReportingSession(reportingAlarm);
 	}
 
-	public void stopReporting(boolean reportUnreportedLocations) {
+	public synchronized void stopReporting(boolean reportUnreportedLocations) {
 		reportingSession.getReportingAlarm().stopRecurringAlarm();
 		reportingSession = null;
 
@@ -149,6 +209,25 @@ public class LocationTracer<StorageLocation> {
 
 	private LocationManager getLocationManager() {
 		return (LocationManager)context.getSystemService(Context.LOCATION_SERVICE);
+	}
+
+	/**
+	 * @param activeListeningLocationProviderDeterminationStrategy The strategy used to determine which
+	 *         {@link LocationProvider} to request locations from when listening actively.
+	 */
+	public void setActiveListeningLocationProviderDeterminationStrategy(
+			LocationProviderDeterminationStrategy activeListeningLocationProviderDeterminationStrategy) {
+		this.activeListeningLocationProviderDeterminationStrategy = activeListeningLocationProviderDeterminationStrategy;
+	}
+
+	/**
+	 * @param passiveListeningLocationProviderDeterminationStrategy The strategy used to determine which
+	 *         {@link LocationProvider} to request locations from if/when requesting active location updates during
+	 *         passive listening.
+	 */
+	public void setPassiveListeningLocationProviderDeterminationStrategy(
+			LocationProviderDeterminationStrategy passiveListeningLocationProviderDeterminationStrategy) {
+		this.passiveListeningLocationProviderDeterminationStrategy = passiveListeningLocationProviderDeterminationStrategy;
 	}
 
 	private static class ReportingSession {
@@ -201,7 +280,7 @@ public class LocationTracer<StorageLocation> {
 				// Since a passive listener should already be listening for the location update that this request hopes
 				// to cause, a no-op location listener is used to avoid offering duplicate updates to the cache.
 				getLocationManager().requestSingleUpdate(
-						passiveListeningLocationProviderStrategy.determineLocationProvider(getLocationManager()),
+						passiveListeningLocationProviderDeterminationStrategy.determineLocationProvider(getLocationManager()),
 						DefaultLocationListener.INSTANCE,
 						Looper.myLooper());
 			}
