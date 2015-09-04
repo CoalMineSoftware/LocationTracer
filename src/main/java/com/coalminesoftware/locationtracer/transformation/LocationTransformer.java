@@ -2,7 +2,7 @@ package com.coalminesoftware.locationtracer.transformation;
 
 import android.location.Location;
 
-import com.coalminesoftware.locationtracer.caching.LocationStore;
+import com.coalminesoftware.locationtracer.storage.LocationStore;
 
 /**
  * Transforms observed {@link Location}s into a given type prior to being offered to a {@link LocationStore}.
@@ -16,7 +16,7 @@ import com.coalminesoftware.locationtracer.caching.LocationStore;
  * <p>
  * A transformer could also be written to minimize an application's memory usage.  If an application is only concerned
  * with a subset of the fields present in a Location (perhaps just latitude, longitude and time,) locations could be
- * stored as instances of a new class that has no relation to Android's Location class.  Its corresponding transmformer
+ * stored as instances of a new class that has no relation to Android's Location class.  Its corresponding transformer
  * might looks like this:
  * 
  * <pre><code>public class MinimalLocationTransformer implements LocationTransformer&lt;MinimalLocation&gt; {

@@ -3,7 +3,7 @@ package com.coalminesoftware.locationtracer.listener;
 import android.location.Location;
 import android.os.SystemClock;
 
-import com.coalminesoftware.locationtracer.caching.LocationStore;
+import com.coalminesoftware.locationtracer.storage.LocationStore;
 import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 
 /**

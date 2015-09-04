@@ -10,12 +10,12 @@ import android.os.Looper;
 
 import com.coalminesoftware.locationtracer.alarm.IrregularRecurringAlarm;
 import com.coalminesoftware.locationtracer.alarm.RecurringAlarm;
-import com.coalminesoftware.locationtracer.caching.LocationStore;
 import com.coalminesoftware.locationtracer.listener.CachingLocationListener;
 import com.coalminesoftware.locationtracer.listener.DefaultLocationListener;
 import com.coalminesoftware.locationtracer.provider.LocationProviderDeterminationStrategy;
 import com.coalminesoftware.locationtracer.provider.SimpleLocationProviderDeterminationStrategy;
 import com.coalminesoftware.locationtracer.reporting.LocationReporter;
+import com.coalminesoftware.locationtracer.storage.LocationStore;
 import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 import com.coalminesoftware.locationtracer.transformation.PassthroughLocationTransformer;
 

@@ -1,10 +1,10 @@
-package com.coalminesoftware.locationtracer.caching;
+package com.coalminesoftware.locationtracer.storage;
 
 import android.os.SystemClock;
 
 /**
  * Convenience implementation of {@link LocationStore} that implements {@link #getLastLocationAcceptanceTime()} by
- * returning the a stored time that subclasses update by calling {@link #updateLastAcceptedLocationTime()} when their
+ * returning the stored timestamp that subclasses update by calling {@link #updateLastAcceptedLocationTime()} when their
  * {@link #offerLocation(Object)} implementation accepts a location.
  *
  * @param <StorageLocation>
