@@ -54,4 +54,8 @@ public class InMemoryLocationStore<StorageLocation> extends BaseLocationStore<St
 	public void removeLocations(Collection<StorageLocation> locations) {
 		this.locations.removeAll(locations);
 	}
+
+	public void setLocationCountLimit(int locationCountLimit) {
+		this.locationCountLimit = locationCountLimit;
+	}
 }
