@@ -1,5 +1,6 @@
 package com.coalminesoftware.locationtracer.reporting;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface LocationReporter<StorageLocation> {
@@ -9,5 +10,13 @@ public interface LocationReporter<StorageLocation> {
 	 * @param locations Locations to report.
 	 * @return The locations that were successfully reported.
 	 */
-	List<StorageLocation> reportLocations(List<StorageLocation> locations);
+	void reportLocations(List<StorageLocation> locations, ReportCompletionHandler<StorageLocation> reportCompletionNotifier);
+
+	/**
+	 * Used by {@link LocationReporter} implementers to notify the library that the locations
+	 * provided to {@link LocationReporter#reportLocations(List)} were successfully reported.
+	 */
+	public interface ReportCompletionHandler<StorageLocation> {
+		void onLocationReportComplete(Collection<StorageLocation> reportedLocations);
+	}
 }
