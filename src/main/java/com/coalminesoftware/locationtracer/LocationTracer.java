@@ -207,7 +207,7 @@ public class LocationTracer<StorageLocation> {
 	private void reportStoredLocations() {
 		if(locationStore.getLocationCount() > 0) {
 			List<StorageLocation> locations = locationStore.getLocations();
-			locationReporter.reportLocations(locations, new LocationRemovingReportCompletionNotifier<StorageLocation>(locationStore));
+			locationReporter.reportLocations(locations, new LocationRemovingReportCompletionHandler<StorageLocation>(locationStore));
 		}
 	}
 
@@ -309,10 +309,10 @@ public class LocationTracer<StorageLocation> {
 	/**
 	 * {@link ReportCompletionHandler} implementation that removes locations from the store once reported.
 	 */
-	private static class LocationRemovingReportCompletionNotifier<StorageLocation> implements ReportCompletionHandler<StorageLocation> {
+	private static class LocationRemovingReportCompletionHandler<StorageLocation> implements ReportCompletionHandler<StorageLocation> {
 		private final WeakReference<LocationStore<StorageLocation>> storeReference;
 		
-		public LocationRemovingReportCompletionNotifier(LocationStore<StorageLocation> locationStore) {
+		public LocationRemovingReportCompletionHandler(LocationStore<StorageLocation> locationStore) {
 			storeReference = new WeakReference<LocationStore<StorageLocation>>(locationStore);
 		}
 
