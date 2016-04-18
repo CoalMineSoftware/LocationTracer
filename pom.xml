@@ -4,11 +4,11 @@
 
 	<groupId>com.coalminesoftware</groupId>
 	<artifactId>location-tracer</artifactId>
-	<version>1.0.0</version>
+	<version>1.1.0</version>
 	<packaging>jar</packaging>
 
 	<name>Location Tracer</name>
-	<url>https://github.com/coalminesoftware/LocationTracer</url>
+	<url>https://github.com/CoalMineSoftware/LocationTracer</url>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

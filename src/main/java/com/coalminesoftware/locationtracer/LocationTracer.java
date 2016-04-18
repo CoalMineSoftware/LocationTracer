@@ -1,5 +1,7 @@
 package com.coalminesoftware.locationtracer;
 
+import java.lang.ref.WeakReference;
+import java.util.Collection;
 import java.util.List;
 
 import android.content.Context;
@@ -8,6 +10,7 @@ import android.location.LocationListener;
 import android.location.LocationManager;
 import android.location.LocationProvider;
 import android.os.Looper;
+import android.util.Log;
 
 import com.coalminesoftware.locationtracer.alarm.IrregularRecurringAlarm;
 import com.coalminesoftware.locationtracer.alarm.RecurringAlarm;
@@ -16,11 +19,13 @@ import com.coalminesoftware.locationtracer.listener.DefaultLocationListener;
 import com.coalminesoftware.locationtracer.provider.LocationProviderDeterminationStrategy;
 import com.coalminesoftware.locationtracer.provider.SimpleLocationProviderDeterminationStrategy;
 import com.coalminesoftware.locationtracer.reporting.LocationReporter;
+import com.coalminesoftware.locationtracer.reporting.LocationReporter.ReportCompletionHandler;
 import com.coalminesoftware.locationtracer.storage.LocationStore;
 import com.coalminesoftware.locationtracer.transformation.LocationTransformer;
 import com.coalminesoftware.locationtracer.transformation.PassthroughLocationTransformer;
 
 public class LocationTracer<StorageLocation> {
+	private static final String LOGGING_TAG = "LocationTracer";
 	private static final long DEFAULT_MINIMUM_LOCATION_UPDATE_INTERVAL_DURATION = 1000;
 	private static final float DEFAULT_MINIMUM_LOCATION_UPDATE_DISTANCE = 0.0f;
 
@@ -202,8 +207,7 @@ public class LocationTracer<StorageLocation> {
 	private void reportStoredLocations() {
 		if(locationStore.getLocationCount() > 0) {
 			List<StorageLocation> locations = locationStore.getLocations();
-			List<StorageLocation> reportedLocations = locationReporter.reportLocations(locations);
-			locationStore.removeLocations(reportedLocations);
+			locationReporter.reportLocations(locations, new LocationRemovingReportCompletionNotifier<StorageLocation>(locationStore));
 		}
 	}
 
@@ -301,6 +305,27 @@ public class LocationTracer<StorageLocation> {
 			return timeElapsed >= locationUpdateIntervalDuration;
 		}
 	}
+
+	/**
+	 * {@link ReportCompletionHandler} implementation that removes locations from the store once reported.
+	 */
+	private static class LocationRemovingReportCompletionNotifier<StorageLocation> implements ReportCompletionHandler<StorageLocation> {
+		private final WeakReference<LocationStore<StorageLocation>> storeReference;
+		
+		public LocationRemovingReportCompletionNotifier(LocationStore<StorageLocation> locationStore) {
+			storeReference = new WeakReference<LocationStore<StorageLocation>>(locationStore);
+		}
+
+		@Override
+		public void onLocationReportComplete(Collection<StorageLocation> locations) {
+			LocationStore<StorageLocation> store = storeReference.get();
+			if(store == null) {
+				Log.w(LOGGING_TAG, "Location store no longer exists. Ignoring reporting completion.");
+			} else {
+				store.removeLocations(locations);
+			}
+		}			
+	};
 }
 
 
