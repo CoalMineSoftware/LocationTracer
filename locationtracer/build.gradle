@@ -1,3 +1,4 @@
+// Can an Android library be used to generate a JAR instead of an AAR?
 apply plugin: 'com.android.library'
 
 android {
@@ -8,7 +9,7 @@ android {
         minSdkVersion 15
         targetSdkVersion 'N'
         versionCode 1
-        versionName "1.0"
+        versionName "1.1.0"
     }
     buildTypes {
         release {
@@ -34,9 +35,6 @@ android.libraryVariants.all { variant ->
             links "http://docs.oracle.com/javase/7/docs/api/", "https://www.mapbox.com/android-sdk/api/3.2.0/"
             linksOffline "http://d.android.com/reference/", "${android.sdkDirectory}/docs/reference"
         }
-
-//        include '**/LocationTracker.java'
-//        include '**/Configuration.java'
 
         failOnError false
     }
