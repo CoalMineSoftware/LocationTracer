@@ -1,4 +1,5 @@
-/.settings
-/target
-/.classpath
-/.project
+/.gradle
+/.idea
+/build
+/local.properties
+*.iml

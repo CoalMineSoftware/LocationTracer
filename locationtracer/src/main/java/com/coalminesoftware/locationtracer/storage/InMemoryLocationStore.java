@@ -11,7 +11,7 @@ import java.util.List;
  * locations are removed in the order they were offered to the store.
  */
 public class InMemoryLocationStore<StorageLocation> extends BaseLocationStore<StorageLocation> {
-	private Deque<StorageLocation> locations = new LinkedList<StorageLocation>();
+	private Deque<StorageLocation> locations = new LinkedList<>();
 	private int locationCountLimit;
 
 	public InMemoryLocationStore(int locationCountLimit) {

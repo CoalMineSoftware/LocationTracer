@@ -14,7 +14,8 @@ public interface LocationReporter<StorageLocation> {
 
 	/**
 	 * Used by {@link LocationReporter} implementers to notify the library that the locations
-	 * provided to {@link LocationReporter#reportLocations(List)} were successfully reported.
+	 * provided to {@link LocationReporter#reportLocations(List, ReportCompletionHandler)} were
+	 * successfully reported.
 	 */
 	public interface ReportCompletionHandler<StorageLocation> {
 		void onLocationReportComplete(Collection<StorageLocation> reportedLocations);
