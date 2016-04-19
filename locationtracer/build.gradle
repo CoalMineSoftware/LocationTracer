@@ -2,12 +2,12 @@
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 'android-N'
+    compileSdkVersion 22 // 'android-N'
     buildToolsVersion "23.0.3"
 
     defaultConfig {
         minSdkVersion 15
-        targetSdkVersion 'N'
+        targetSdkVersion 22 // 'N'
         versionCode 1
         versionName "1.1.0"
     }
@@ -43,5 +43,5 @@ android.libraryVariants.all { variant ->
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     testCompile 'junit:junit:4.12'
-    compile 'com.android.support:appcompat-v7:24.+'
+//    compile 'com.android.support:appcompat-v7:22.+'
 }
