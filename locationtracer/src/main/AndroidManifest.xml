@@ -1,3 +1,5 @@
-<manifest package="com.coalminesoftware.locationtracer">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.coalminesoftware.locationtracer">
     <application />
+
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 </manifest>
