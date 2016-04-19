@@ -18,6 +18,30 @@ android {
     }
 }
 
+android.libraryVariants.all { variant ->
+    task("generate${variant.name.capitalize()}Javadoc", type: Javadoc) {
+        description "Generates Javadoc for $variant.name."
+        title "Location Tracer"
+
+        source = variant.javaCompile.source
+        exclude '**/BuildConfig.java'
+        exclude '**/R.java'
+
+        ext.androidJar = "${android.sdkDirectory}/platforms/${android.compileSdkVersion}/android.jar"
+        classpath = files(variant.javaCompile.classpath.files) + files(ext.androidJar)
+
+        options {
+            links "http://docs.oracle.com/javase/7/docs/api/", "https://www.mapbox.com/android-sdk/api/3.2.0/"
+            linksOffline "http://d.android.com/reference/", "${android.sdkDirectory}/docs/reference"
+        }
+
+//        include '**/LocationTracker.java'
+//        include '**/Configuration.java'
+
+        failOnError false
+    }
+}
+
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     testCompile 'junit:junit:4.12'
