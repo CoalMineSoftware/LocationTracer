@@ -1,15 +1,14 @@
-// Can an Android library be used to generate a JAR instead of an AAR?
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion 22 // 'android-N'
+    compileSdkVersion 22
     buildToolsVersion "23.0.3"
 
     defaultConfig {
         minSdkVersion 15
-        targetSdkVersion 22 // 'N'
+        targetSdkVersion 22
         versionCode 1
-        versionName "1.1.0"
+        versionName "1.2.0"
     }
     buildTypes {
         release {
@@ -43,5 +42,4 @@ android.libraryVariants.all { variant ->
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     testCompile 'junit:junit:4.12'
-//    compile 'com.android.support:appcompat-v7:22.+'
 }
