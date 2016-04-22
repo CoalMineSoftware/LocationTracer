@@ -96,9 +96,9 @@ public class LocationTracer<StorageLocation> {
 
 	/**
 	 * Starts passively listening for location updates that happen at the request of other code.
-	 * @param wakeForActiveLocationRequests
+	 * Observed locations will only be stored if it occurred at least a second after the last.
 	 */
-	public void startListeningPassively(boolean wakeForActiveLocationRequests) {
+	public void startListeningPassively() {
 		startListeningPassively(
 				DEFAULT_MINIMUM_LOCATION_UPDATE_INTERVAL_DURATION,
 				DEFAULT_MINIMUM_LOCATION_UPDATE_DISTANCE,
@@ -107,11 +107,33 @@ public class LocationTracer<StorageLocation> {
 	}
 
 	/**
+	 * Starts passively listening for location updates that happen at the request of other code. For a location to be
+	 * stored, it must have occurred at least the given amount of time after the last and be at least the given
+	 * distance away.
+	 *
+	 * @param minimumLocationUpdateIntervalDuration The minimum number of milliseconds that need to have elapsed since
+	 * the last location in order for the new location to be stored.
+	 * @param minimumLocationUpdateDistance The minimum displacement, in meters, that needs to exist between a location
+	 * and the preceding location in order for the new location to be stored.
+	 */
+	public void startListeningPassively(
+			long minimumLocationUpdateIntervalDuration,
+			float minimumLocationUpdateDistance) {
+		startListeningPassively(
+				minimumLocationUpdateIntervalDuration,
+				minimumLocationUpdateDistance,
+				null,
+				false);
+	}
+
+	/**
 	 * Starts passively listening for location updates that happen at the request of other code. If a location update is
 	 * not received within a certain amount of time, a location is actively requested.
-	 * 
-	 * @param minimumLocationUpdateIntervalDuration The minimum number of milliseconds requested between location updates. 
-	 * @param minimumLocationUpdateDistance The minimum displacement, in meters, that needs to exist between a location and the preceding location.
+	 *
+	 * @param minimumLocationUpdateIntervalDuration The minimum number of milliseconds that need to have elapsed since
+	 * the last location in order for the new location to be stored.
+	 * @param minimumLocationUpdateDistance The minimum displacement, in meters, that needs to exist between a location
+	 * and the preceding location in order for the new location to be stored.
 	 * @param activeLocationRequestInterval How long to wait since the last location update before actively requesting another. 
 	 * @param wakeForActiveLocationRequests Whether to wake the device when requesting active location updates.
 	 */
