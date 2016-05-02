@@ -10,7 +10,8 @@ import android.os.SystemClock;
 
 public abstract class BaseRecurringAlarm extends BroadcastReceiver {
 	private static final String BASE_ALARM_ACTION = "com.coalminesoftware.locationtracer.TRIGGER_RECURRING_ALARM";
-	private static int GENERATED_ACTION_COUNT = 0;
+
+	private static int generatedActionCount = 0;
 
 	private Context context;
 	private int alarmType;
@@ -80,11 +81,11 @@ public abstract class BaseRecurringAlarm extends BroadcastReceiver {
 	private static String generateAction(Context context) {
 		return context.getPackageName() + "/" +
 				BASE_ALARM_ACTION + "/" +
-				GENERATED_ACTION_COUNT++;
+				generatedActionCount++;
 	}
 
 	private static PendingIntent buildPendingIntent(Context context, String action) {
 		Intent intent = new Intent(action);
-		return PendingIntent.getBroadcast(context, 0, intent, 0);
+		return PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
 	}
 }

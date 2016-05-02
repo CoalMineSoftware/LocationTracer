@@ -6,7 +6,7 @@ import java.util.List;
 import android.os.SystemClock;
 
 /**
- * Used to store observed locations prior to being reported at a semi-regular interval.
+ * Used to store observed locations in between regular uploads.
  *
  * @param <StorageLocation>
  */

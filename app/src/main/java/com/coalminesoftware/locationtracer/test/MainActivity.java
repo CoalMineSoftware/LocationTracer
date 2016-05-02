@@ -69,7 +69,7 @@ public class MainActivity extends Activity {
 //		tracer.startListeningActively();
 //		tracer.startListeningActively(2000, 0.1f);
 //		tracer.startListeningPassively(false);
-		tracer.startListeningPassively(2000, 0.0f, 5000, false);
+		tracer.startListeningPassively(2000, 0f, 5000, false);
 	}
 
 	@Override
